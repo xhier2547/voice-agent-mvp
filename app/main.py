@@ -3,7 +3,8 @@ import asyncio
 import logging
 import datetime
 from fastapi import FastAPI, WebSocket, Request, Response, Body
-from fastapi.responses import HTMLResponse, JSONResponse
+import os
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 import websockets
 from app import config, audio, twilio_client, gemini_client
 
@@ -48,6 +49,54 @@ async def get_reservations_api():
         return {"status": "success", "data": data}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+@app.get("/api/recordings/{filename}")
+async def get_recording_api(filename: str):
+    filepath = os.path.join("recordings", filename)
+    if os.path.exists(filepath):
+        return FileResponse(filepath, media_type="audio/wav")
+    return JSONResponse({"status": "error", "message": "Recording file not found"}, status_code=404)
+
+def save_call_log(phone: str, caller_name: str, summary: str = None, recording_file: str = None):
+    try:
+        try:
+            with open("data/call_logs.json", "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = {}
+        
+        phone_key = phone or "081-234-5678"
+        if phone_key not in logs:
+            logs[phone_key] = {
+                "caller_name": caller_name or "Vera Sun",
+                "phone": phone_key,
+                "total_calls": 0,
+                "last_call_time": "",
+                "last_summary": "ลูกค้าโทรเข้ามาสนทนากับระบบ Voice Agent",
+                "recording_file": None,
+                "history": []
+            }
+        
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        logs[phone_key]["caller_name"] = caller_name or logs[phone_key]["caller_name"]
+        logs[phone_key]["total_calls"] += 1
+        logs[phone_key]["last_call_time"] = now_str
+        if summary:
+            logs[phone_key]["last_summary"] = summary
+        if recording_file:
+            logs[phone_key]["recording_file"] = recording_file
+
+        logs[phone_key]["history"].append({
+            "timestamp": now_str,
+            "topic": "บันทึกการโทรสนทนาโต้ตอบสด",
+            "recording_file": recording_file
+        })
+
+        with open("data/call_logs.json", "w", encoding="utf-8") as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
+        logger.info(f"Saved call log & audio recording for {phone_key}: {recording_file}")
+    except Exception as e:
+        logger.error(f"Error saving call log: {e}")
 
 def load_phone_modal_template() -> str:
     try:
@@ -1830,6 +1879,12 @@ async def get_index():
                         statusText.textContent = 'กำลังโหลดคำสั่งบอท...';
                         log('Connected to server. Initializing audio...', 'system');
                         
+                        const nameInp = document.getElementById('dialer-name');
+                        const phoneInp = document.getElementById('dialer-phone');
+                        const cName = nameInp ? nameInp.value.trim() : 'Vera Sun';
+                        const cPhone = phoneInp ? phoneInp.value.trim() : '081-234-5678';
+                        ws.send(JSON.stringify({{ event: 'setup', name: cName, phone: cPhone }}));
+
                         // Initialize Audio Context for recording and playback with low latency
                         audioContext = new (window.AudioContext || window.webkitAudioContext)({{ latencyHint: 'interactive' }});
                         
@@ -2102,6 +2157,15 @@ async def get_index():
                                 const item = data[phone];
                                 const card = document.createElement('div');
                                 card.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:10px; padding:12px; font-size:12px;';
+                                const audioPlayerHtml = item.recording_file ? `
+                                    <div style="margin-top:8px; background:#fafafa; border:1px solid var(--border-color); border-radius:8px; padding:8px;">
+                                        <div style="font-size:11px; font-weight:700; color:#09090b; margin-bottom:4px; display:flex; align-items:center; gap:6px;">
+                                            <span>🎧</span>
+                                            <span>ฟังเสียงบันทึกการโทร (Call Audio Recording):</span>
+                                        </div>
+                                        <audio controls style="width:100%; height:36px;" src="/api/recordings/${{escapeHtml(item.recording_file)}}"></audio>
+                                    </div>
+                                ` : '';
                                 card.innerHTML = `
                                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                                         <span style="font-weight:700; color:#09090b;">👤 ${{escapeHtml(item.caller_name || 'ลูกค้า')}} (${{escapeHtml(phone)}})</span>
@@ -2109,6 +2173,7 @@ async def get_index():
                                     </div>
                                     <div style="color:var(--text-muted); font-size:11px; margin-bottom:4px;">⏱️ ล่าสุด: ${{escapeHtml(item.last_call_time || '')}}</div>
                                     <div style="background:#fafafa; border:1px solid var(--border-color); border-radius:6px; padding:6px 8px; color:#09090b;">📝 ${{escapeHtml(item.last_summary || '')}}</div>
+                                    ${{audioPlayerHtml}}
                                 `;
                                 logsContainer.appendChild(card);
                             }});
@@ -2380,6 +2445,8 @@ async def handle_local_stream(client_ws: WebSocket):
             await gemini_ws.send(json.dumps(setup_msg))
             print("DEBUG: Sent setup message to Gemini for local stream.", flush=True)
             
+            recorder = audio.CallAudioRecorder(phone="081-234-5678", caller_name="Vera Sun")
+
             # Task: Stream from client web browser to Gemini
             async def client_to_gemini_task():
                 try:
@@ -2388,9 +2455,15 @@ async def handle_local_stream(client_ws: WebSocket):
                         if session["transferring"]:
                             break
                         event = message.get("event")
-                        if event == "audio":
+                        if event == "setup":
+                            p = message.get("phone")
+                            n = message.get("name")
+                            if p: recorder.phone = p
+                            if n: recorder.caller_name = n
+                        elif event == "audio":
                             pcm_b64 = message.get("data")
                             if pcm_b64:
+                                recorder.add_user_audio(pcm_b64)
                                 gemini_msg = {
                                     "realtimeInput": {
                                         "mediaChunks": [
@@ -2406,7 +2479,6 @@ async def handle_local_stream(client_ws: WebSocket):
                             user_text = message.get("text")
                             if user_text:
                                 print(f"DEBUG User Text Input: {user_text}", flush=True)
-                                # Emit RAG Match Event to client for detailed console logging
                                 try:
                                     rag_match = gemini_client.match_knowledge(user_text)
                                     await client_ws.send_json({
@@ -2451,7 +2523,6 @@ async def handle_local_stream(client_ws: WebSocket):
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
                             
-                            # Check for Barge-in (Interruption)
                             if server_content.get("interrupted"):
                                 print("DEBUG: Interruption detected (Barge-in)! Clearing client buffers.", flush=True)
                                 await client_ws.send_json({"event": "clear"})
@@ -2464,7 +2535,6 @@ async def handle_local_stream(client_ws: WebSocket):
                                     text = part.get("text")
                                     if text:
                                         clean_text = text.strip()
-                                        # Filter out internal English thinking process / COT notes
                                         if not (clean_text.startswith("**") or "I have identified" in clean_text or "Retrieving" in clean_text or "Gathering" in clean_text or "Confirming" in clean_text or "I've" in clean_text):
                                             print(f"DEBUG Gemini Text: {clean_text}", flush=True)
                                             try:
@@ -2477,6 +2547,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                     inline_data = part.get("inlineData")
                                     if inline_data and inline_data.get("mimeType", "").startswith("audio/pcm"):
                                         pcm_24k_b64 = inline_data.get("data")
+                                        recorder.add_bot_audio(pcm_24k_b64)
                                         try:
                                             await client_ws.send_json({
                                                 "event": "audio",
@@ -2640,6 +2711,9 @@ async def handle_local_stream(client_ws: WebSocket):
         logger.exception(f"Error in local media stream relay: {e}")
     finally:
         logger.info("Cleaning up local connections...")
+        rec_file = recorder.save()
+        if rec_file:
+            save_call_log(phone=recorder.phone, caller_name=recorder.caller_name, recording_file=rec_file)
         try:
             await client_ws.close()
         except Exception:

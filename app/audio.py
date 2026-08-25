@@ -1,8 +1,61 @@
 import audioop
 import base64
 import logging
+import wave
+import os
+import datetime
 
 logger = logging.getLogger("VoiceAgent")
+
+class CallAudioRecorder:
+    def __init__(self, phone: str = "081-234-5678", caller_name: str = "Vera Sun"):
+        self.phone = phone or "081-234-5678"
+        self.caller_name = caller_name or "Vera Sun"
+        self.sample_rate = 16000
+        clean_phone = "".join(c for c in self.phone if c.isalnum() or c == '-')
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        self.filename = f"call_{clean_phone}_{timestamp}.wav"
+        self.filepath = os.path.join("recordings", self.filename)
+        self.frames = bytearray()
+        self.rate_state = None
+        os.makedirs("recordings", exist_ok=True)
+
+    def add_user_audio(self, pcm_16k_b64: str):
+        """Adds user's incoming mic 16kHz PCM audio bytes."""
+        try:
+            pcm_bytes = base64.b64decode(pcm_16k_b64)
+            if pcm_bytes:
+                self.frames.extend(pcm_bytes)
+        except Exception as e:
+            logger.warning(f"Error adding user audio to recorder: {e}")
+
+    def add_bot_audio(self, pcm_24k_b64: str):
+        """Downsamples bot's 24kHz PCM audio response to 16kHz PCM and adds to recording."""
+        try:
+            pcm_24k = base64.b64decode(pcm_24k_b64)
+            if pcm_24k:
+                pcm_16k, self.rate_state = audioop.ratecv(
+                    pcm_24k, 2, 1, 24000, 16000, self.rate_state
+                )
+                self.frames.extend(pcm_16k)
+        except Exception as e:
+            logger.warning(f"Error adding bot audio to recorder: {e}")
+
+    def save(self) -> str:
+        """Saves accumulated PCM frames into a standard WAV file."""
+        if not self.frames or len(self.frames) < 1000:
+            return None
+        try:
+            with wave.open(self.filepath, 'wb') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2) # 16-bit PCM
+                wf.setframerate(self.sample_rate) # 16000 Hz
+                wf.writeframes(self.frames)
+            logger.info(f"Saved call audio recording to: {self.filepath}")
+            return self.filename
+        except Exception as e:
+            logger.error(f"Failed to save call audio recording: {e}")
+            return None
 
 def twilio_to_gemini(ulaw_b64: str, state):
     """
