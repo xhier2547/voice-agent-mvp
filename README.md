@@ -24,9 +24,10 @@
 - [x] **4. Speech Understanding & Agent Brain**
   - [x] ใช้ **Gemini 2.5 Flash Native Audio Model (`models/gemini-2.5-flash-native-audio-latest`)** ทำหน้าที่เป็นสมองหลักทั้งฟัง เข้าใจความหมาย และประมวลผลคำตอบ
 
-- [x] **5. Knowledge Base & RAG Admin System**
-  - [x] **RAG Memory Injection**: ดึงข้อมูลเวลาเปิด-ปิด, ที่ตั้ง, รหัส Wi-Fi, โปรโมชั่น และ FAQ จาก `data/knowledge.json` เข้าสู่ System Prompt
-  - [x] **Interactive RAG Admin (Tab 3)**: หน้าเว็บสำหรับแก้ไข บันทึก เพิ่ม หรือลบข้อมูล FAQ และโปรโมชั่นแบบเรียลไทม์ พร้อม Hot-Reload เข้า AI
+- [x] **5. Knowledge Base & Vector Database RAG (ChromaDB)**
+  - [x] **Vector Database Engine (ChromaDB)**: เปลี่ยนระบบค้นหา RAG จาก Keyword Search ไปเป็น **Vector Embeddings (ChromaDB)** ค้นหาความหมายเชิงลึก (Semantic Search) ได้แม่นยำแม้ใช้คำไม่ตรงกัน
+  - [x] **Auto Vector Index Sync**: เมื่อแก้ไขหรือเพิ่มข้อมูลในคลังความรู้ Tab 3 ระบบจะทำการ Re-index เวกเตอร์เข้า ChromaDB ในโฟลเดอร์ `data/chroma_db/` โดยอัตโนมัติ
+  - [x] **Interactive RAG Admin (Tab 3)**: หน้าเว็บสำหรับแก้ไข บันทึก เพิ่ม หรือลบข้อมูล FAQ และโปรโมชั่นแบบเรียลไทม์ พร้อม Hot-Reload เข้า Vector Engine
 
 - [x] **6. Agent Tools / Function Calling ("มือ" ของ Agent)**
   - [x] 📅 `book_table`: รับจองโต๊ะ/ห้องประชุม และบันทึกลง `data/reservations.json`
@@ -54,11 +55,9 @@
   - [ ] ทดสอบเชื่อมต่อรับสาย/โทรออกผ่านเบอร์โทรศัพท์จริงด้วย **Twilio Voice SIP / Media Streams** และ Public Ngrok URL
 - [ ] **2. Database Integration**
   - [ ] อัปเกรดระบบจัดเก็บข้อมูลจากไฟล์ JSON (`knowledge.json`, `call_logs.json`, `reservations.json`) ไปเป็น **PostgreSQL / SQLite** ร่วมกับ **SQLAlchemy ORM**
-- [ ] **3. Vector Database RAG**
-  - [ ] อัปเกรดระบบค้นหา RAG จาก Keyword Matcher เป็น **Vector Embeddings (Pinecone / ChromaDB / Qdrant)** สำหรับค้นหาตามความหมายเชิงลึก (Semantic Search)
-- [ ] **4. Multi-Agent & Safety Guardrails**
+- [ ] **3. Multi-Agent & Safety Guardrails**
   - [ ] ติดตั้ง Topic Enforcer / Guardrails ป้องกัน Jailbreak และควบคุมไม่ให้ AI ตอบเรื่องนอกเหนือจากขอบเขตธุรกิจ
-- [ ] **5. Real SMS / LINE Messaging Integration**
+- [ ] **4. Real SMS / LINE Messaging Integration**
   - [ ] เชื่อมต่อ API จริงกับ Twilio SMS หรือ LINE Messaging API เพื่อส่งข้อความยืนยันการจอง/รหัส Wi-Fi เข้ามือถือลูกค้าจริงหลังวางสาย
 
 ---

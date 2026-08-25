@@ -26,8 +26,9 @@ async def save_knowledge_api(payload: dict = Body(...)):
     try:
         with open("data/knowledge.json", "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
-        logger.info("Updated data/knowledge.json via Knowledge Base Manager API.")
-        return {"status": "success", "message": "บันทึกฐานข้อมูลร้านค้าเรียบร้อยแล้ว!"}
+        gemini_client.vector_rag_engine.sync_knowledge()
+        logger.info("Updated data/knowledge.json and synced ChromaDB Vector Store.")
+        return {"status": "success", "message": "บันทึกฐานข้อมูลและดรรชนี Vector Database เรียบร้อยแล้ว!"}
     except Exception as e:
         logger.error(f"Failed to update knowledge base: {e}")
         return {"status": "error", "message": str(e)}
