@@ -4,6 +4,7 @@ import json
 import asyncio
 import logging
 import datetime
+import time
 from fastapi import FastAPI, WebSocket, Request, Response, Body
 import os
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
@@ -1483,8 +1484,8 @@ async def get_index():
                 const lt = latencyTracker;
                 if (!lt.speechEnd || !lt.playback) return;
 
-                const vadDelay = lt.geminiSend && lt.speechEnd ? Math.max(0, Math.round(lt.geminiSend - lt.speechEnd)) : 0;
-                const geminiNetLag = lt.geminiFirstResponse && lt.geminiSend ? Math.max(0, Math.round(lt.geminiFirstResponse - lt.geminiSend)) : 0;
+                const vadWindowMs = lt.vadEnd && lt.speechEnd ? Math.max(0, Math.round(lt.vadEnd - lt.speechEnd)) : 600;
+                const geminiNetLag = lt.geminiFirstResponse && lt.vadEnd ? Math.max(0, Math.round(lt.geminiFirstResponse - lt.vadEnd)) : 0;
                 const audioGenLag = lt.firstAudio && lt.geminiFirstResponse ? Math.max(0, Math.round(lt.firstAudio - lt.geminiFirstResponse)) : 0;
                 const browserPlaybackLag = lt.playback && lt.firstAudio ? Math.max(0, Math.round(lt.playback - lt.firstAudio)) : 0;
                 const totalE2E = Math.max(0, Math.round(lt.playback - lt.speechEnd));
@@ -1493,24 +1494,9 @@ async def get_index():
                 // Identify primary bottleneck
                 let bottleneck = "Gemini Model Inference / WebSocket";
                 let maxVal = geminiNetLag;
-                if (vadDelay > maxVal) {{ bottleneck = "VAD Silence Timeout / Hangover"; maxVal = vadDelay; }}
+                if (vadWindowMs > maxVal) {{ bottleneck = "VAD Silence Timeout / Hangover"; maxVal = vadWindowMs; }}
                 if (audioGenLag > maxVal) {{ bottleneck = "Gemini Audio Packetization"; maxVal = audioGenLag; }}
                 if (browserPlaybackLag > maxVal) {{ bottleneck = "Browser AudioContext Buffer Scheduling"; maxVal = browserPlaybackLag; }}
-                if (lt.ragTime > maxVal) {{ bottleneck = "RAG Vector Search"; maxVal = lt.ragTime; }}
-
-                console.log("=====================================================");
-                console.log("📊 LATENCY BOTTLENECK ANALYSIS SUMMARY");
-                console.log("=====================================================");
-                console.table({{
-                    "1. SPEECH START": {{ RelTime: "0 ms", Detail: "Voice energy detected (RMS > 0.006)" }},
-                    "2. SPEECH END": {{ RelTime: `+${{userSpeakDuration}} ms`, Detail: `User finished speaking (Spoke ${{userSpeakDuration}}ms)` }},
-                    "3. GEMINI SEND": {{ RelTime: `+${{vadDelay}} ms (VAD Delay)`, Detail: "Audio/Turn payload sent to Gemini" }},
-                    "4. GEMINI FIRST RESP": {{ RelTime: `+${{geminiNetLag}} ms (API/Net Lag)`, Detail: "First serverContent frame received" }},
-                    "5. FIRST AUDIO": {{ RelTime: `+${{audioGenLag}} ms (TTS Lag)`, Detail: "First 24kHz PCM packet received" }},
-                    "6. PLAYBACK": {{ RelTime: `+${{browserPlaybackLag}} ms (Browser Lag)`, Detail: "Audio playback initiated on speakers" }},
-                    "TOTAL E2E TURNAROUND": {{ RelTime: `${{totalE2E}} ms (${{(totalE2E/1000).toFixed(2)}}s)`, Detail: `PRIMARY BOTTLENECK: ${{bottleneck}}` }}
-                }});
-                console.log("=====================================================");
 
                 if (consoleEl) {{
                     const card = document.createElement('div');
@@ -1519,8 +1505,8 @@ async def get_index():
                         <div class="summary-title">📊 LATENCY BOTTLENECK ANALYSIS SUMMARY</div>
                         <div class="summary-row"><span>1. SPEECH START</span><span>0 ms</span></div>
                         <div class="summary-row"><span>2. SPEECH END</span><span>+${{userSpeakDuration}} ms (User spoke ${{userSpeakDuration}}ms)</span></div>
-                        <div class="summary-row"><span>3. GEMINI SEND (VAD Lag)</span><span>+${{vadDelay}} ms</span></div>
-                        <div class="summary-row"><span>4. GEMINI FIRST RESPONSE (Model & Net)</span><span>+${{geminiNetLag}} ms</span></div>
+                        <div class="summary-row"><span>3. CLIENT VAD END (Silence Window)</span><span>+${{vadWindowMs}} ms</span></div>
+                        <div class="summary-row"><span>4. SERVER & GEMINI INFERENCE</span><span>+${{geminiNetLag}} ms</span></div>
                         <div class="summary-row"><span>5. FIRST AUDIO (TTS Packetization)</span><span>+${{audioGenLag}} ms</span></div>
                         <div class="summary-row"><span>6. PLAYBACK (Browser AudioContext)</span><span>+${{browserPlaybackLag}} ms</span></div>
                         <div class="summary-row total"><span>⏱️ TOTAL TURNAROUND (SPEECH END -> PLAYBACK)</span><span>${{totalE2E}} ms (${{(totalE2E/1000).toFixed(2)}}s)</span></div>
@@ -2140,7 +2126,10 @@ async def get_index():
                                         latencyTracker.isSpeaking = true;
                                         resetTurnMetrics();
                                         latencyTracker.speechStart = now;
-                                        logMilestone("🎙️ SPEECH START", "User started speaking (RMS > ${SPEECH_THRESHOLD} ");
+                                        if (ws && ws.readyState === WebSocket.OPEN) {{
+                                            ws.send(JSON.stringify({{ event: 'turn_start' }}));
+                                        }}
+                                        logMilestone("🎙️ SPEECH START", `User started speaking (RMS > ${SPEECH_THRESHOLD})`);
                                     }}
                                     if (latencyTracker.silenceTimer) {{
                                         clearTimeout(latencyTracker.silenceTimer);
@@ -2152,10 +2141,16 @@ async def get_index():
                                         const silenceNow = performance.now();
                                         latencyTracker.isSpeaking = false;
                                         latencyTracker.speechEnd = silenceNow - 600;
+                                        latencyTracker.vadEnd = silenceNow;
                                         logMilestone("⏹️ SPEECH END", "Silence detected for 600ms hangover window");
-
-                                        latencyTracker.geminiSend = silenceNow;
                                         logMilestone("⏹️ CLIENT VAD END", "Browser detected 600ms silence");
+
+                                        if (ws && ws.readyState === WebSocket.OPEN) {{
+                                            ws.send(JSON.stringify({{
+                                                event: 'vad_end',
+                                                timestamp: silenceNow
+                                            }}));
+                                        }}
                                         latencyTracker.silenceTimer = null;
                                     }}, 600);
 
@@ -2560,9 +2555,6 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                     if inline_data and inline_data.get("mimeType", "").startswith("audio/pcm"):
                                         pcm_24k_b64 = inline_data.get("data")
                                         if session["stream_sid"]:
-                                            ulaw_b64, gemini_to_twilio_state = audio.gemini_to_twilio(
-                                                pcm_24k_b64, gemini_to_twilio_state
-                                            )
                                             if ulaw_b64:
                                                 media_msg = {
                                                     "event": "media",
@@ -2638,7 +2630,21 @@ async def handle_local_stream(client_ws: WebSocket):
     gemini_url = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={config.GEMINI_API_KEY}"
     
     session = {
-        "transferring": False
+        "transferring": False,
+
+        # latency & chunk instrumentation
+        "turn_id": 0,
+        "turn_active": False,
+        "turn_start": None,
+        "vad_end": None,
+        "last_audio_sent": None,
+        "gemini_send": None,
+        "first_frame": None,
+        "first_audio": None,
+
+        "audio_chunks_sent": 0,
+        "vad_audio_chunks": None,
+        "client_speaking": True,
     }
     setup_event = asyncio.Event()
     
@@ -2652,6 +2658,9 @@ async def handle_local_stream(client_ws: WebSocket):
             setup_msg = gemini_client.build_setup_message(sys_instruction)
             await gemini_ws.send(json.dumps(setup_msg))
             print("DEBUG: Sent setup message to Gemini for local stream.", flush=True)
+            
+            def now_ms():
+                return time.perf_counter() * 1000
             
             recorder = audio.CallAudioRecorder(phone="081-234-5678", caller_name="Vera Sun")
 
@@ -2668,27 +2677,66 @@ async def handle_local_stream(client_ws: WebSocket):
                             n = message.get("name")
                             if p: recorder.phone = p
                             if n: recorder.caller_name = n
+                        elif event == "turn_start":
+                            # DEBUG: detect overlapping turns
+                            if session["turn_active"]:
+                                logger.warning(
+                                    f"[TURN OVERLAP] "
+                                    f"New turn started while TURN {session['turn_id']} is still active"
+                                )
+
+                            session["turn_id"] += 1
+                            session["turn_active"] = True
+                            session["client_speaking"] = True
+
+                            session["speech_start_ms"] = now_ms()
+                            session["speech_end_ms"] = None
+                            session["gemini_first_ms"] = None
+                            session["gemini_audio_ms"] = None
+                            session["vad_audio_chunks"] = None
+
+                            logger.info(
+                                f"[TURN {session['turn_id']}] START"
+                            )
+                        elif event == "vad_end":
+                            session["speech_end_ms"] = now_ms()
+                            session["vad_audio_chunks"] = session["audio_chunks_sent"]
+
+                            logger.info(
+                                f"[TURN {session['turn_id']}] VAD_END "
+                                f"audio_chunks={session['vad_audio_chunks']}"
+                            )
                         elif event == "audio":
                             pcm_b64 = message.get("data")
                             if pcm_b64:
-                                recorder.add_user_audio(pcm_b64)
-                                gemini_msg = {
-                                    "realtimeInput": {
-                                        "mediaChunks": [
-                                            {
-                                                "mimeType": "audio/pcm;rate=16000",
-                                                "data": pcm_b64
-                                            }
-                                        ]
+                                if session.get("client_speaking", True):
+                                    gemini_msg = {
+                                        "realtimeInput": {
+                                            "mediaChunks": [
+                                                {
+                                                    "mimeType": "audio/pcm;rate=16000",
+                                                    "data": pcm_b64
+                                                }
+                                            ]
+                                        }
                                     }
-                                }
-                                await gemini_ws.send(json.dumps(gemini_msg))
+
+                                    await gemini_ws.send(json.dumps(gemini_msg))
+                                    session["audio_chunks_sent"] += 1
+
+                                try:
+                                    asyncio.create_task(
+                                        asyncio.to_thread(recorder.add_user_audio, pcm_b64)
+                                    )
+                                except Exception as e:
+                                    logger.warning(
+                                        f"Recorder user audio failed: {e}"
+                                    )
                         elif event == "text":
                             user_text = message.get("text")
                             if user_text:
                                 print(f"DEBUG User Text Input: {user_text}", flush=True)
                                 try:
-                                    import time
                                     t0_rag = time.perf_counter()
                                     rag_match = gemini_client.match_knowledge(user_text)
                                     rag_ms = round((time.perf_counter() - t0_rag) * 1000, 1)
@@ -2736,20 +2784,57 @@ async def handle_local_stream(client_ws: WebSocket):
                             
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
-                            
+
+                            if (
+                                session["turn_active"]
+                                and session["gemini_first_ms"] is None
+                            ):
+                                session["gemini_first_ms"] = now_ms()
+                                session["client_speaking"] = False  # Stop forwarding mic while bot is speaking
+                                
+                                latency = 0
+                                if session["speech_end_ms"] is not None:
+                                    latency = session["gemini_first_ms"] - session["speech_end_ms"]
+
+                                logger.info(
+                                    f"[TURN {session['turn_id']}] FIRST_GEMINI_MESSAGE "
+                                    f"latency={latency:.1f}ms"
+                                )
+
                             if server_content.get("turnComplete"):
-                                print(f"DEBUG: GEMINI TURN COMPLETE at {datetime.datetime.now()}", flush=True)
+                                logger.info(
+                                    f"[TURN {session['turn_id']}] TURN_COMPLETE"
+                                )
+
                                 try:
-                                    await client_ws.send_json({"event": "turn_complete"})
+                                    await client_ws.send_json({
+                                        "event": "turn_complete",
+                                        "turn_id": session["turn_id"]
+                                    })
                                 except Exception:
                                     pass
 
-                            if server_content.get("interrupted"):
+                                session["turn_active"] = False
+                                session["client_speaking"] = True  # Start listening again
 
-                                print("DEBUG: Interruption detected (Barge-in)! Clearing client buffers.", flush=True)
-                                await client_ws.send_json({"event": "clear"})
+                            if server_content.get("interrupted"):
+                                logger.info(
+                                    f"[TURN {session['turn_id']}] INTERRUPTED / BARGE-IN"
+                                )
+
+                                try:
+                                    await client_ws.send_json({
+                                        "event": "clear",
+                                        "turn_id": session["turn_id"]
+                                    })
+                                except Exception:
+                                    pass
+
+                                session["turn_active"] = False
+                                session["client_speaking"] = True  # Start listening again
+
                                 continue
-                                
+
                             model_turn = server_content.get("modelTurn")
                             if model_turn:
                                 parts = model_turn.get("parts", [])
@@ -2769,7 +2854,22 @@ async def handle_local_stream(client_ws: WebSocket):
                                     inline_data = part.get("inlineData")
                                     if inline_data and inline_data.get("mimeType", "").startswith("audio/pcm"):
                                         pcm_24k_b64 = inline_data.get("data")
-                                        recorder.add_bot_audio(pcm_24k_b64)
+
+                                        if (
+                                            session["turn_active"]
+                                            and session["gemini_audio_ms"] is None
+                                        ):
+                                            session["gemini_audio_ms"] = now_ms()
+
+                                            latency_ms = 0
+                                            if session["gemini_first_ms"] is not None:
+                                                latency_ms = session["gemini_audio_ms"] - session["gemini_first_ms"]
+
+                                            logger.info(
+                                                f"[TURN {session['turn_id']}] FIRST_AUDIO "
+                                                f"delta={latency_ms:.1f}ms"
+                                            )
+
                                         try:
                                             await client_ws.send_json({
                                                 "event": "audio",
@@ -2777,6 +2877,13 @@ async def handle_local_stream(client_ws: WebSocket):
                                             })
                                         except Exception:
                                             break
+
+                                        try:
+                                            asyncio.create_task(
+                                                asyncio.to_thread(recorder.add_bot_audio, pcm_24k_b64)
+                                            )
+                                        except Exception as e:
+                                            logger.warning(f"Recorder output failed: {e}")
                                         
                         elif "toolCall" in data:
                             tool_call = data["toolCall"]
@@ -2785,7 +2892,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                 fn_name = fc.get("name")
                                 call_id = fc.get("id")
                                 args = fc.get("args", {})
-                                print(f"DEBUG: Gemini requested tool call '{fn_name}'. ID: {call_id}, Args: {args}", flush=True)
+                                logger.info(f"[TURN {session['turn_id']}] TOOL_CALL fn={fn_name} id={call_id}")
 
                                 if fn_name == "end_call":
                                     result = gemini_client.execute_end_call(args.get("reason"))

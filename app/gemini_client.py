@@ -41,8 +41,7 @@ def get_caller_memory(phone: str = None, name: str = None, logs_path: str = "dat
 
 def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_name: str = None, caller_phone: str = None) -> str:
     """
-    Reads the knowledge base JSON file and builds a customized System Prompt
-    injecting RAG context and Customer Memory.
+    Reads the knowledge base JSON file and builds a customized System Prompt.
     """
     try:
         with open(knowledge_path, "r", encoding="utf-8") as f:
@@ -55,52 +54,24 @@ def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_n
             "location": "ชั้น 1 อาคารทรู ดิจิทัล พาร์ค สุขุมวิท 101 กรุงเทพฯ",
             "contact_number": "02-123-4567",
             "wifi_password": "DripAICoffeeGuest (ความเร็ว 500/500 Mbps)",
-            "promotions": [],
-            "faq": []
         }
 
-    # Construct the instruction text
-    prompt = f"""
-คุณคือผู้ช่วย AI บริการลูกค้าทางโทรศัพท์ของร้าน "{data['company_name']}"
-หน้าที่ของคุณคือตอบคำถามของลูกค้าอย่างสุภาพ เป็นมิตร และตอบกลับอย่างรวดเร็วทันใจ (<200ms)
+    prompt = f"""คุณคือพนักงานบริการลูกค้าของ "{data.get('company_name', '')}"
 
-ข้อมูลร้านค้าและบริการเพื่อใช้ตอบคำถาม (RAG):
-- เวลาเปิดทำการ: {data['operating_hours']}
-- สถานที่ตั้งและที่จอดรถ: {data['location']}
-- เบอร์ติดต่อ: {data['contact_number']}
-- รหัส Wi-Fi: {data['wifi_password']}
+ตอบภาษาไทย สั้น กระชับ เป็นธรรมชาติ
 
-โปรโมชั่นปัจจุบัน:
-"""
-    for promo in data.get('promotions', []):
-        prompt += f"- {promo['name']}: {promo['detail']}\n"
+ข้อมูลร้าน:
+- เวลาเปิด: {data.get('operating_hours', '')}
+- สถานที่: {data.get('location', '')}
+- เบอร์: {data.get('contact_number', '')}
+- Wi-Fi: {data.get('wifi_password', '')}
 
-    prompt += "\nคำถามที่พบบ่อย (FAQ):\n"
-    for item in data.get('faq', []):
-        prompt += f"ถาม: {item['question']}\nตอบ: {item['answer']}\n\n"
-
-    # Inject Customer Memory
-    caller_mem = get_caller_memory(caller_phone, caller_name)
-    if caller_mem:
-        prompt += caller_mem
-
-    prompt += """
-คำแนะนำสำหรับการสนทนาทางโทรศัพท์จริง (Real-Time Ultra Low Latency):
-1. คุณคือพนักงานรับสายสด (Real-Time Live Voice Agent) ให้ตอบกลับทันทีแบบเรียลไทม์ (<200ms)
-2. ตอบกลับภาษาไทยด้วยประโยคสั้นกระชับ 1 ประโยคสั้นๆ (5-8 คำ) ห้ามเกริ่นอัมบท ห้ามทวนคำถาม ห้ามเว้นจังหวะ เพื่อให้สตรีมมิ่งเสียงตอบกลับได้เร็วที่สุดทันที
-3. ตอบเข้าประเด็นทันที เช่น 'ร้านเปิดเจ็ดโมงถึงสองทุ่มค่ะ', 'รหัสไวไฟคือ DripAICoffeeGuest ค่ะ'
-4. เมื่อตอบคำถามของลูกค้าเรียบร้อย ให้ถามลูกค้าอย่างสุภาพว่า 'มีอะไรให้ช่วยเหลือเพิ่มเติมไหมคะ?'
-5. หากลูกค้าตอบว่า 'ไม่มีแล้ว', 'ไม่มีครับ/ค่ะ', 'ขอบคุณครับ/ค่ะ', 'ขอบคุณมาก', 'เท่านี้ครับ' หรือปฏิเสธไม่ถามต่อ:
-   - ให้พูดขอบคุณอย่างเป็นธรรมชาติ เช่น 'ยินดีให้บริการค่ะ ขอบคุณที่ใช้บริการ DripAI Coffee สวัสดีค่ะ'
-   - และเรียกใช้ฟังก์ชัน `end_call` ทันทีเพื่อวางสายและจบการสนทนา!
-6. ห้ามพิมพ์ข้อความความคิดในใจ ภาษาอังกฤษ หรือหัวข้ออธิบาย เด็ดขาด
-7. สามารถใช้ Tools เมื่อลูกค้าต้องการ:
-   - วางสาย/จบการสนทนา: เรียกใช้ `end_call`
-   - จองโต๊ะ / จองห้องประชุม: เรียกใช้ `book_table`
-   - เช็กแต้มสะสมสมาชิก: เรียกใช้ `check_member_points`
-   - ส่ง SMS สรุปข้อมูลเข้ามือถือลูกค้า: เรียกใช้ `send_sms_info`
-   - โอนสายหาพนักงานมนุษย์: เรียกใช้ `transfer_call`
-"""
+กฎ:
+- ตอบสั้น
+- อย่าทวนคำถาม
+- อย่าอธิบายความคิดภายใน
+- ใช้ tool เมื่อจำเป็น"""
+    
     return prompt
 
 def build_setup_message(system_instruction: str) -> dict:
@@ -128,8 +99,8 @@ def build_setup_message(system_instruction: str) -> dict:
             "realtimeInputConfig": {
                 "automaticActivityDetection": {
                     "disabled": False,
-                    "prefixPaddingMs": 20,
-                    "silenceDurationMs": 300
+                    "prefixPaddingMs": 40,
+                    "silenceDurationMs": 200
                 }
             },
 
