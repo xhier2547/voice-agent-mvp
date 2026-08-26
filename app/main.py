@@ -2425,9 +2425,9 @@ async def get_index():
 
 @app.post("/incoming-call")
 async def incoming_call(request: Request):
-    # Log incoming request headers for debugging using print
-    headers = dict(request.headers)
-    print(f"DEBUG: Incoming call request headers: {headers}", flush=True)
+    form_data = await request.form()
+    from_number = form_data.get("From", "+66812345678")
+    print(f"DEBUG: Incoming call from: {from_number}", flush=True)
     
     # Try x-forwarded-host first (often sent by ngrok/proxies), then fallback to host
     host = request.headers.get("x-forwarded-host") or request.headers.get("host")
@@ -2436,7 +2436,7 @@ async def incoming_call(request: Request):
     twiml_response = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Connect>
-        <Stream url="wss://{host}/media-stream" />
+        <Stream url="wss://{host}/media-stream?phone={from_number}" />
     </Connect>
 </Response>
 """
@@ -2447,6 +2447,9 @@ async def incoming_call(request: Request):
 async def handle_media_stream(twilio_ws: WebSocket):
     await twilio_ws.accept()
     print("DEBUG: Accepted Twilio WebSocket connection.", flush=True)
+    
+    phone = twilio_ws.query_params.get("phone")
+    print(f"DEBUG: Twilio WebSocket connected. Caller Phone from query param: {phone}", flush=True)
     
     if not config.GEMINI_API_KEY or "PLACEHOLDER" in config.GEMINI_API_KEY:
         print("DEBUG ERROR: GEMINI_API_KEY is not configured or is a placeholder.", flush=True)
@@ -2467,11 +2470,11 @@ async def handle_media_stream(twilio_ws: WebSocket):
         async with websockets.connect(gemini_url) as gemini_ws:
             print("DEBUG: Connected to Gemini Live API WebSocket.", flush=True)
             
-            # Send initial setup message first
-            sys_instruction = gemini_client.get_system_instruction()
+            # Send initial setup message first with customer memory!
+            sys_instruction = gemini_client.get_system_instruction(caller_phone=phone)
             setup_msg = gemini_client.build_setup_message(sys_instruction)
             await gemini_ws.send(json.dumps(setup_msg))
-            print("DEBUG: Sent setup message to Gemini.", flush=True)
+            print("DEBUG: Sent setup message to Gemini with Twilio memory.", flush=True)
             
             # Task: Stream from Twilio to Gemini
             async def twilio_to_gemini_task():
@@ -2651,23 +2654,42 @@ async def handle_local_stream(client_ws: WebSocket):
     try:
         async with websockets.connect(gemini_url) as gemini_ws:
             print("DEBUG: Connected to Gemini Live API WebSocket for local stream.", flush=True)
-            await client_ws.send_json({"event": "status", "text": "Connected to Gemini Live API"})
-            
+            # Wait for browser's setup event to inject memory
+            first_message = None
+            p = "081-234-5678"
+            n = "Vera Sun"
+            try:
+                first_message = await asyncio.wait_for(client_ws.receive_json(), timeout=2.0)
+                if first_message and first_message.get("event") == "setup":
+                    p = first_message.get("phone", p)
+                    n = first_message.get("name", n)
+            except Exception as e:
+                print(f"DEBUG WARNING: Error reading setup message from browser: {e}", flush=True)
+
             # Send setup message BEFORE starting audio tasks
-            sys_instruction = gemini_client.get_system_instruction()
+            sys_instruction = gemini_client.get_system_instruction(caller_phone=p, caller_name=n)
             setup_msg = gemini_client.build_setup_message(sys_instruction)
             await gemini_ws.send(json.dumps(setup_msg))
-            print("DEBUG: Sent setup message to Gemini for local stream.", flush=True)
+            print(f"DEBUG: Sent setup message to Gemini for local stream (phone={p}, name={n}).", flush=True)
             
             def now_ms():
                 return time.perf_counter() * 1000
             
-            recorder = audio.CallAudioRecorder(phone="081-234-5678", caller_name="Vera Sun")
+            recorder = audio.CallAudioRecorder(phone=p, caller_name=n)
 
             # Task: Stream from client web browser to Gemini
             async def client_to_gemini_task():
+                nonlocal first_message
                 try:
                     await setup_event.wait()
+                    
+                    # Handle already consumed setup message
+                    if first_message:
+                        event = first_message.get("event")
+                        if event == "setup":
+                            pass
+                        first_message = None
+
                     async for message in client_ws.iter_json():
                         if session["transferring"]:
                             break
