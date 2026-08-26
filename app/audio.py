@@ -1,9 +1,13 @@
-import audioop
+try:
+    import audioop
+except ImportError:
+    import audioop_lts as audioop
 import base64
 import logging
 import wave
 import os
 import datetime
+
 
 logger = logging.getLogger("VoiceAgent")
 

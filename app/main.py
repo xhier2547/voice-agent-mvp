@@ -1,3 +1,5 @@
+from IPython.core import magic_arguments
+from IPython.core import magic_arguments
 import json
 import asyncio
 import logging
@@ -141,6 +143,7 @@ async def get_index():
     if not faq_html:
         faq_html = "<p style='color: var(--text-muted); font-size: 13px;'>ไม่มีคำถามที่พบบ่อย</p>"
 
+    SPEECH_THRESHOLD = None
     html_content = f"""
     <!DOCTYPE html>
     <html lang="th">
@@ -704,6 +707,58 @@ async def get_index():
                 padding-left: 12px;
                 border-left: 2px solid var(--warning-color);
             }}
+
+            .console-milestone {{
+                background: rgba(16, 185, 129, 0.08);
+                border: 1px solid rgba(16, 185, 129, 0.25);
+                border-radius: 8px;
+                padding: 6px 12px;
+                margin-bottom: 6px;
+                font-family: monospace;
+                font-size: 11px;
+                color: #6ee7b7;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }}
+
+            .console-summary {{
+                background: rgba(99, 102, 241, 0.12);
+                border: 1px solid rgba(99, 102, 241, 0.4);
+                border-radius: 12px;
+                padding: 14px 16px;
+                margin-bottom: 14px;
+                font-family: monospace;
+                font-size: 12px;
+                color: #e0e7ff;
+            }}
+
+            .summary-title {{
+                font-weight: 800;
+                font-size: 13px;
+                color: #818cf8;
+                margin-bottom: 8px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }}
+
+            .summary-row {{
+                display: flex;
+                justify-content: space-between;
+                padding: 3px 0;
+                border-bottom: 1px dashed rgba(255,255,255,0.1);
+            }}
+
+            .summary-row.total {{
+                border-top: 1px solid rgba(255,255,255,0.3);
+                border-bottom: none;
+                font-weight: 700;
+                color: #34d399;
+                margin-top: 6px;
+                padding-top: 6px;
+            }}
+
 
             .modal-overlay {{
                 position: fixed;
@@ -1377,6 +1432,106 @@ async def get_index():
                 consoleEl.scrollTop = consoleEl.scrollHeight;
             }}
 
+            // Latency Tracker & Milestone Instrumentation
+            const latencyTracker = {{
+                speechStart: null,
+                speechEnd: null,
+                geminiSend: null,
+                geminiFirstResponse: null,
+                firstAudio: null,
+                playback: null,
+                isSpeaking: false,
+                silenceTimer: null,
+                hasFirstResponseForTurn: false,
+                hasFirstAudioForTurn: false,
+                hasPlaybackForTurn: false,
+                ragTime: 0
+            }};
+
+            function resetTurnMetrics() {{
+                latencyTracker.speechStart = null;
+                latencyTracker.speechEnd = null;
+                latencyTracker.geminiSend = null;
+                latencyTracker.geminiFirstResponse = null;
+                latencyTracker.firstAudio = null;
+                latencyTracker.playback = null;
+                latencyTracker.hasFirstResponseForTurn = false;
+                latencyTracker.hasFirstAudioForTurn = false;
+                latencyTracker.hasPlaybackForTurn = false;
+            }}
+
+            function logMilestone(name, description, timeMs = null) {{
+                const now = timeMs !== null ? timeMs : performance.now();
+                const timeStr = new Date().toLocaleTimeString() + '.' + String(Math.floor(now % 1000)).padStart(3, '0');
+                const relTime = latencyTracker.speechStart ? `+${{Math.round(now - latencyTracker.speechStart)}}ms` : '0ms';
+                
+                console.log(`⏱️ [MILESTONE] ${{name}} | Rel: ${{relTime}} | ${{description}}`);
+                
+                if (consoleEl) {{
+                    const div = document.createElement('div');
+                    div.className = 'console-milestone';
+                    div.innerHTML = `
+                        <span><strong>${{escapeHtml(name)}}</strong> - ${{escapeHtml(description)}}</span>
+                        <span style="opacity:0.85; font-weight:bold;">${{escapeHtml(relTime)}} [${{timeStr}}]</span>
+                    `;
+                    consoleEl.appendChild(div);
+                    consoleEl.scrollTop = consoleEl.scrollHeight;
+                }}
+            }}
+
+            function renderLatencySummary() {{
+                const lt = latencyTracker;
+                if (!lt.speechEnd || !lt.playback) return;
+
+                const vadDelay = lt.geminiSend && lt.speechEnd ? Math.max(0, Math.round(lt.geminiSend - lt.speechEnd)) : 0;
+                const geminiNetLag = lt.geminiFirstResponse && lt.geminiSend ? Math.max(0, Math.round(lt.geminiFirstResponse - lt.geminiSend)) : 0;
+                const audioGenLag = lt.firstAudio && lt.geminiFirstResponse ? Math.max(0, Math.round(lt.firstAudio - lt.geminiFirstResponse)) : 0;
+                const browserPlaybackLag = lt.playback && lt.firstAudio ? Math.max(0, Math.round(lt.playback - lt.firstAudio)) : 0;
+                const totalE2E = Math.max(0, Math.round(lt.playback - lt.speechEnd));
+                const userSpeakDuration = lt.speechEnd && lt.speechStart ? Math.max(0, Math.round(lt.speechEnd - lt.speechStart)) : 0;
+
+                // Identify primary bottleneck
+                let bottleneck = "Gemini Model Inference / WebSocket";
+                let maxVal = geminiNetLag;
+                if (vadDelay > maxVal) {{ bottleneck = "VAD Silence Timeout / Hangover"; maxVal = vadDelay; }}
+                if (audioGenLag > maxVal) {{ bottleneck = "Gemini Audio Packetization"; maxVal = audioGenLag; }}
+                if (browserPlaybackLag > maxVal) {{ bottleneck = "Browser AudioContext Buffer Scheduling"; maxVal = browserPlaybackLag; }}
+                if (lt.ragTime > maxVal) {{ bottleneck = "RAG Vector Search"; maxVal = lt.ragTime; }}
+
+                console.log("=====================================================");
+                console.log("📊 LATENCY BOTTLENECK ANALYSIS SUMMARY");
+                console.log("=====================================================");
+                console.table({{
+                    "1. SPEECH START": {{ RelTime: "0 ms", Detail: "Voice energy detected (RMS > 0.006)" }},
+                    "2. SPEECH END": {{ RelTime: `+${{userSpeakDuration}} ms`, Detail: `User finished speaking (Spoke ${{userSpeakDuration}}ms)` }},
+                    "3. GEMINI SEND": {{ RelTime: `+${{vadDelay}} ms (VAD Delay)`, Detail: "Audio/Turn payload sent to Gemini" }},
+                    "4. GEMINI FIRST RESP": {{ RelTime: `+${{geminiNetLag}} ms (API/Net Lag)`, Detail: "First serverContent frame received" }},
+                    "5. FIRST AUDIO": {{ RelTime: `+${{audioGenLag}} ms (TTS Lag)`, Detail: "First 24kHz PCM packet received" }},
+                    "6. PLAYBACK": {{ RelTime: `+${{browserPlaybackLag}} ms (Browser Lag)`, Detail: "Audio playback initiated on speakers" }},
+                    "TOTAL E2E TURNAROUND": {{ RelTime: `${{totalE2E}} ms (${{(totalE2E/1000).toFixed(2)}}s)`, Detail: `PRIMARY BOTTLENECK: ${{bottleneck}}` }}
+                }});
+                console.log("=====================================================");
+
+                if (consoleEl) {{
+                    const card = document.createElement('div');
+                    card.className = 'console-summary';
+                    card.innerHTML = `
+                        <div class="summary-title">📊 LATENCY BOTTLENECK ANALYSIS SUMMARY</div>
+                        <div class="summary-row"><span>1. SPEECH START</span><span>0 ms</span></div>
+                        <div class="summary-row"><span>2. SPEECH END</span><span>+${{userSpeakDuration}} ms (User spoke ${{userSpeakDuration}}ms)</span></div>
+                        <div class="summary-row"><span>3. GEMINI SEND (VAD Lag)</span><span>+${{vadDelay}} ms</span></div>
+                        <div class="summary-row"><span>4. GEMINI FIRST RESPONSE (Model & Net)</span><span>+${{geminiNetLag}} ms</span></div>
+                        <div class="summary-row"><span>5. FIRST AUDIO (TTS Packetization)</span><span>+${{audioGenLag}} ms</span></div>
+                        <div class="summary-row"><span>6. PLAYBACK (Browser AudioContext)</span><span>+${{browserPlaybackLag}} ms</span></div>
+                        <div class="summary-row total"><span>⏱️ TOTAL TURNAROUND (SPEECH END -> PLAYBACK)</span><span>${{totalE2E}} ms (${{(totalE2E/1000).toFixed(2)}}s)</span></div>
+                        <div style="margin-top:8px; font-size:11px; color:#fcd34d; background:rgba(245,158,11,0.1); padding:6px 10px; border-radius:6px; border:1px solid rgba(245,158,11,0.3);">🔍 BOTTLENECK CAUSE: <strong>${{escapeHtml(bottleneck)}}</strong> (${{maxVal}} ms)</div>
+                    `;
+                    consoleEl.appendChild(card);
+                    consoleEl.scrollTop = consoleEl.scrollHeight;
+                }}
+            }}
+
+
             // Tabs switching
             const tabBtns = document.querySelectorAll('.tab-btn');
             const tabContents = document.querySelectorAll('.tab-content');
@@ -1908,6 +2063,13 @@ async def get_index():
                                 player.audioCtx.resume();
                             }}
 
+                            if (!latencyTracker.hasPlaybackForTurn) {{
+                                latencyTracker.hasPlaybackForTurn = true;
+                                latencyTracker.playback = performance.now();
+                                logMilestone("🔊 PLAYBACK", "Audio playback initiated on browser speakers (AudioContext)");
+                                renderLatencySummary();
+                            }}
+
                             const binaryString = window.atob(pcm16Base64);
                             const len = binaryString.length;
                             const bytes = new Uint8Array(len);
@@ -1969,8 +2131,34 @@ async def get_index():
                                     sum += inputData[i] * inputData[i];
                                 }}
                                 const rms = Math.sqrt(sum / inputData.length);
-                                if (rms > 0.006) {{
-                                    lastSpeechTimestamp = performance.now();
+                                const now = performance.now();
+
+                                const SPEECH_THRESHOLD = 0.015;
+                                if (rms > SPEECH_THRESHOLD) {{
+                                    lastSpeechTimestamp = now;
+                                    if (!latencyTracker.isSpeaking) {{
+                                        latencyTracker.isSpeaking = true;
+                                        resetTurnMetrics();
+                                        latencyTracker.speechStart = now;
+                                        logMilestone("🎙️ SPEECH START", "User started speaking (RMS > ${SPEECH_THRESHOLD} ");
+                                    }}
+                                    if (latencyTracker.silenceTimer) {{
+                                        clearTimeout(latencyTracker.silenceTimer);
+                                        latencyTracker.silenceTimer = null;
+                                    }}
+                                }} else if (latencyTracker.isSpeaking && !latencyTracker.silenceTimer) {{
+                                    // Silence detected: start VAD hangover window (600ms)
+                                    latencyTracker.silenceTimer = setTimeout(() => {{
+                                        const silenceNow = performance.now();
+                                        latencyTracker.isSpeaking = false;
+                                        latencyTracker.speechEnd = silenceNow - 600;
+                                        logMilestone("⏹️ SPEECH END", "Silence detected for 600ms hangover window");
+
+                                        latencyTracker.geminiSend = silenceNow;
+                                        logMilestone("⏹️ CLIENT VAD END", "Browser detected 600ms silence");
+                                        latencyTracker.silenceTimer = null;
+                                    }}, 600);
+
                                 }}
                                 
                                 const resampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
@@ -1999,6 +2187,11 @@ async def get_index():
                                 if (phonePreview) phonePreview.textContent = '🤖 Gemini: พร้อมรับสายแล้วครับ...';
                             }}
                         }} else if (msg.event === 'text') {{
+                            if (!latencyTracker.hasFirstResponseForTurn) {{
+                                latencyTracker.hasFirstResponseForTurn = true;
+                                latencyTracker.geminiFirstResponse = performance.now();
+                                logMilestone("📥 GEMINI FIRST RESPONSE", "First text/content response received from Gemini Live API");
+                            }}
                             addChatMessage(msg.text, 'bot');
                             log('🤖 Gemini: ' + msg.text, 'gemini');
                             if (phonePreview) phonePreview.textContent = '🤖 Gemini: ' + msg.text;
@@ -2008,10 +2201,20 @@ async def get_index():
                             logToolExecution(msg.tool, msg.target, msg.description);
                             if (typeof loadCustomerHistory === 'function') loadCustomerHistory();
                         }} else if (msg.event === 'audio') {{
+                            if (!latencyTracker.hasFirstResponseForTurn) {{
+                                latencyTracker.hasFirstResponseForTurn = true;
+                                latencyTracker.geminiFirstResponse = performance.now();
+                                logMilestone("📥 GEMINI FIRST RESPONSE", "First message frame received from Gemini Live API");
+                            }}
+                            if (!latencyTracker.hasFirstAudioForTurn) {{
+                                latencyTracker.hasFirstAudioForTurn = true;
+                                latencyTracker.firstAudio = performance.now();
+                                logMilestone("🎵 FIRST AUDIO", "First 24kHz PCM audio packet received");
+                            }}
                             player.playChunk(msg.data);
                             if (!isReceivingAudio) {{
                                 isReceivingAudio = true;
-                                const latency = lastSpeechTimestamp ? Math.round(performance.now() - lastSpeechTimestamp) : 180;
+                                const latency = latencyTracker.speechEnd ? Math.round(performance.now() - latencyTracker.speechEnd) : 180;
                                 log(`🔊 [AI AUDIO STREAM] Gemini สตรีมเสียงสด (Latency: ${{latency}}ms, 24kHz PCM)...`, 'gemini');
                                 if (phonePreview) phonePreview.textContent = '🔊 Gemini: กำลังพูดตอบกลับ...';
                             }}
@@ -2019,7 +2222,11 @@ async def get_index():
                             audioResetTimer = setTimeout(() => {{
                                 isReceivingAudio = false;
                             }}, 2000);
+                        }} else if (msg.event === 'turn_complete') {{
+                            latencyTracker.geminiTurnComplete = performance.now();
+                            logMilestone("🏁 GEMINI TURN COMPLETE", "Gemini Live API marked turnComplete=true");
                         }} else if (msg.event === 'clear') {{
+
                             log('Detected user barge-in! Stopping bot playback.', 'system');
                             player.clear();
                         }} else if (msg.event === 'end_call') {{
@@ -2481,16 +2688,22 @@ async def handle_local_stream(client_ws: WebSocket):
                             if user_text:
                                 print(f"DEBUG User Text Input: {user_text}", flush=True)
                                 try:
+                                    import time
+                                    t0_rag = time.perf_counter()
                                     rag_match = gemini_client.match_knowledge(user_text)
+                                    rag_ms = round((time.perf_counter() - t0_rag) * 1000, 1)
+                                    logger.info(f"TIMING: RAG Vector Search completed in {rag_ms}ms")
                                     await client_ws.send_json({
                                         "event": "rag_info",
                                         "query": user_text,
                                         "section": rag_match["section"],
                                         "content": rag_match["content"],
-                                        "file": rag_match["file"]
+                                        "file": rag_match["file"],
+                                        "duration_ms": rag_ms
                                     })
                                 except Exception:
                                     pass
+
 
                                 text_msg = {
                                     "clientContent": {
@@ -2524,7 +2737,15 @@ async def handle_local_stream(client_ws: WebSocket):
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
                             
+                            if server_content.get("turnComplete"):
+                                print(f"DEBUG: GEMINI TURN COMPLETE at {datetime.datetime.now()}", flush=True)
+                                try:
+                                    await client_ws.send_json({"event": "turn_complete"})
+                                except Exception:
+                                    pass
+
                             if server_content.get("interrupted"):
+
                                 print("DEBUG: Interruption detected (Barge-in)! Clearing client buffers.", flush=True)
                                 await client_ws.send_json({"event": "clear"})
                                 continue

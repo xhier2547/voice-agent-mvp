@@ -112,6 +112,11 @@ def build_setup_message(system_instruction: str) -> dict:
             "model": config.get_gemini_model(),
             "generationConfig": {
                 "responseModalities": ["AUDIO"],
+
+                "thinkingConfig": {
+                    "thinkingBudget": 0
+                },
+
                 "speechConfig": {
                     "voiceConfig": {
                         "prebuiltVoiceConfig": {
@@ -120,6 +125,14 @@ def build_setup_message(system_instruction: str) -> dict:
                     }
                 }
             },
+            "realtimeInputConfig": {
+                "automaticActivityDetection": {
+                    "disabled": False,
+                    "prefixPaddingMs": 20,
+                    "silenceDurationMs": 300
+                }
+            },
+
             "systemInstruction": {
                 "parts": [
                     {

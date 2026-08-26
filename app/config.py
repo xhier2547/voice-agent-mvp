@@ -14,4 +14,5 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 TRANSFER_NUMBER = os.getenv("TRANSFER_NUMBER", "+66812345678")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "models/gemini-2.5-flash-native-audio-latest")
 GEMINI_VOICE = os.getenv("GEMINI_VOICE", "Aoede")
-PORT = int(os.getenv("PORT", 8000))
+PORT = int(os.getenv("PORT", 8080))
+
