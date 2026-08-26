@@ -2674,7 +2674,35 @@ async def handle_local_stream(client_ws: WebSocket):
             
             def now_ms():
                 return time.perf_counter() * 1000
-            
+
+            def generate_ping_sound(duration_sec=0.7, sample_rate=24000) -> str:
+                import math
+                import struct
+                import base64
+                num_samples = int(duration_sec * sample_rate)
+                audio_data = bytearray()
+                freq = 440.0  # Soft A4 chime
+                for i in range(num_samples):
+                    t = i / sample_rate
+                    decay = math.exp(-5.0 * t)
+                    value = int(32767 * 0.15 * math.sin(2 * math.pi * freq * t) * decay)
+                    audio_data.extend(struct.pack("<h", value))
+                return base64.b64encode(audio_data).decode("utf-8")
+
+            async def send_conversational_filler(text="อืม... สักครู่นะคะ..."):
+                try:
+                    await client_ws.send_json({
+                        "event": "text",
+                        "text": text
+                    })
+                    ping_b64 = generate_ping_sound()
+                    await client_ws.send_json({
+                        "event": "audio",
+                        "data": ping_b64
+                    })
+                except Exception as e:
+                    logger.warning(f"Failed to send conversational filler: {e}")
+
             recorder = audio.CallAudioRecorder(phone=p, caller_name=n)
 
             # Task: Stream from client web browser to Gemini

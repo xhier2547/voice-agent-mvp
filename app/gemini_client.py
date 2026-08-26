@@ -187,6 +187,17 @@ def build_setup_message(system_instruction: str) -> dict:
                                 },
                                 "required": ["phone"]
                             }
+                        },
+                        {
+                            "name": "query_knowledge",
+                            "description": "ค้นหารายละเอียดข้อมูลร้านค้า นโยบาย เมนู ราคา หรือโปรโมชั่น เพื่อตอบคำถามของลูกค้าด้วยระบบ RAG",
+                            "parameters": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "query": {"type": "STRING", "description": "คีย์เวิร์ดหรือข้อความที่ต้องการค้นหา เช่น เวลาเปิดร้าน, โปรโมชั่น, ราคาลาเต้"}
+                                },
+                                "required": ["query"]
+                            }
                         }
                     ]
                 }
@@ -270,6 +281,30 @@ def execute_check_reservation(phone: str, res_path: str = "data/reservations.jso
             }
     except Exception as e:
         logger.error(f"Failed to check reservation: {e}")
+        return {"status": "error", "message": str(e)}
+
+def execute_query_knowledge(query: str) -> dict:
+    """
+    Queries the RAG Vector Store to retrieve matching business knowledge.
+    """
+    try:
+        if not query:
+            return {"status": "error", "message": "กรุณาระบุสิ่งที่ต้องการค้นหาค่ะ"}
+            
+        result = match_knowledge(query)
+        logger.info(f"RAG Match for query '{query}': {result.get('section')}")
+        
+        section = result.get("section", "คลังความรู้")
+        content = result.get("content", "ไม่พบข้อมูลที่ตรงกันในขณะนี้ค่ะ")
+        
+        return {
+            "status": "success",
+            "section": section,
+            "content": content,
+            "message": f"ดึงข้อมูลจากหัวข้อ '{section}' ค่ะ: {content}"
+        }
+    except Exception as e:
+        logger.error(f"RAG query failed: {e}")
         return {"status": "error", "message": str(e)}
 
 def execute_check_member_points(phone: str) -> dict:
