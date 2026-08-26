@@ -176,6 +176,17 @@ def build_setup_message(system_instruction: str) -> dict:
                                 "properties": {},
                                 "required": []
                             }
+                        },
+                        {
+                            "name": "check_reservation",
+                            "description": "ตรวจสอบข้อมูลการจองโต๊ะหรือจองห้องประชุมส่วนตัวของลูกค้าในระบบด้วยเบอร์โทรศัพท์",
+                            "parameters": {
+                                "type": "OBJECT",
+                                "properties": {
+                                    "phone": {"type": "STRING", "description": "เบอร์โทรศัพท์ที่ใช้จอง"}
+                                },
+                                "required": ["phone"]
+                            }
                         }
                     ]
                 }
@@ -219,6 +230,46 @@ def execute_book_table(name: str, phone: str, date_time: str, guests: int, res_p
         return {"status": "success", "reservation": new_res, "message": f"จองโต๊ะให้คุณ {name} สำหรับ {guests} ท่าน วันที่ {date_time} เรียบร้อยแล้วค่ะ"}
     except Exception as e:
         logger.error(f"Failed to book table: {e}")
+        return {"status": "error", "message": str(e)}
+
+def execute_check_reservation(phone: str, res_path: str = "data/reservations.json") -> dict:
+    """
+    Checks if a reservation exists for the given phone number in reservations.json.
+    """
+    try:
+        if not phone:
+            return {"status": "error", "message": "กรุณาระบุเบอร์โทรศัพท์เพื่อตรวจสอบการจองค่ะ"}
+            
+        clean_phone = "".join(c for c in phone if c.isdigit())
+        
+        try:
+            with open(res_path, "r", encoding="utf-8") as f:
+                res_list = json.load(f)
+        except Exception:
+            res_list = []
+            
+        matches = []
+        for res in res_list:
+            res_phone = "".join(c for c in res.get("phone", "") if c.isdigit())
+            if clean_phone in res_phone or res_phone in clean_phone:
+                matches.append(res)
+                
+        if matches:
+            latest = matches[-1]
+            return {
+                "status": "success",
+                "found": True,
+                "reservation": latest,
+                "message": f"พบข้อมูลการจองภายใต้เบอร์ {phone} ค่ะ: รหัสการจอง {latest['id']} จองโดยคุณ {latest['name']} วันที่ {latest['date_time']} จำนวน {latest['guests']} ท่าน ({latest['type']}) เรียบร้อยแล้วค่ะ"
+            }
+        else:
+            return {
+                "status": "success",
+                "found": False,
+                "message": f"ไม่พบข้อมูลการจองสำหรับเบอร์โทรศัพท์ {phone} ในระบบค่ะ"
+            }
+    except Exception as e:
+        logger.error(f"Failed to check reservation: {e}")
         return {"status": "error", "message": str(e)}
 
 def execute_check_member_points(phone: str) -> dict:

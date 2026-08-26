@@ -3020,6 +3020,29 @@ async def handle_local_stream(client_ws: WebSocket):
                                     }
                                     await gemini_ws.send(json.dumps(tool_resp))
 
+                                elif fn_name == "check_reservation":
+                                    result = gemini_client.execute_check_reservation(args.get("phone"))
+                                    try:
+                                        await client_ws.send_json({
+                                            "event": "tool_info",
+                                            "tool": "🔍 check_reservation",
+                                            "target": args.get("phone", "การจอง"),
+                                            "description": result.get("message")
+                                        })
+                                    except Exception:
+                                        pass
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+
                                 elif fn_name == "transfer_call":
                                     session["transferring"] = True
                                     try:
