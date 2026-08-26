@@ -2569,6 +2569,13 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                                 await twilio_ws.send_json(media_msg)
                                                 
                         elif "toolCall" in data:
+                            try:
+                                await client_ws.send_json({
+                                    "event": "clear",
+                                    "streamSid": None
+                                })
+                            except Exception:
+                                pass
                             tool_call = data["toolCall"]
                             function_calls = tool_call.get("functionCalls", [])
                             for fc in function_calls:
@@ -2936,6 +2943,13 @@ async def handle_local_stream(client_ws: WebSocket):
                                             logger.warning(f"Recorder output failed: {e}")
                                         
                         elif "toolCall" in data:
+                            try:
+                                await client_ws.send_json({
+                                    "event": "clear",
+                                    "streamSid": None
+                                })
+                            except Exception:
+                                pass
                             tool_call = data["toolCall"]
                             function_calls = tool_call.get("functionCalls", [])
                             for fc in function_calls:
