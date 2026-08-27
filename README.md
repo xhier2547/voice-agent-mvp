@@ -30,11 +30,12 @@
   - [x] **Interactive RAG Admin (Tab 3)**: หน้าเว็บสำหรับแก้ไข บันทึก เพิ่ม หรือลบข้อมูล FAQ และโปรโมชั่นแบบเรียลไทม์ พร้อม Hot-Reload เข้า Vector Engine
 
 - [x] **6. Agent Tools / Function Calling ("มือ" ของ Agent)**
+  - [x] 🔍 `query_knowledge`: ดึงข้อมูลโปรโมชั่น นโยบาย เมนู และราคาจากคลังความรู้ด้วย RAG Vector Engine
   - [x] 📅 `book_table`: รับจองโต๊ะ/ห้องประชุม และบันทึกลง `data/reservations.json`
   - [x] 🎁 `check_member_points`: เช็กแต้มสะสมสมาชิกและสิทธิ์ส่วนลด
   - [x] 📲 `send_sms_info`: จำลองการส่ง SMS สรุปข้อมูลร้านค้า/รหัส Wi-Fi เข้ามือถือลูกค้า
   - [x] 📞 `transfer_call`: โอนสายไปยังเจ้าหน้าที่พนักงานมนุษย์
-  - [x] 🛑 `end_call`: กล่าวขอบคุณและวางสายอัตโนมัติเมื่อลูกค้าพูดว่า "ไม่มีแล้ว", "ขอบคุณครับ/ค่ะ" หรือตอบปฏิเสธไม่ถามต่อ
+  - [x] 🛑 `end_call`: กล่าวขอบคุณและวางสายอัตโนมัติโดยรอให้ AI พูดขอบคุณจบประโยคก่อนวางสาย (`Turn Complete` Aware Hangup Timing)
 
 - [x] **7. Customer Memory & Call Audio Recording (ระบบความจำและบันทึกเสียงการโทร)**
   - [x] บันทึกประวัติการโทรย้อนหลังใน `data/call_logs.json`
@@ -45,7 +46,7 @@
 
 - [x] **8. Observability & Latency Monitoring**
   - [x] **Live Console Breakdown**: แสดงเวลาตอบกลับของ Gemini สดๆ บนหน้าเว็บ เช่น `🔊 [AI AUDIO STREAM] Gemini สตรีมเสียงสด (Latency: 180ms, 24kHz PCM)...`
-  - [x] แสดง RAG Matching Source และ Tool Execution Log อย่างละเอียด
+  - [x] แสดง RAG Matching Source และ Tool Execution Log อย่างละเอียดแบบเรียลไทม์ พร้อมแยกประเภท Event (Barge-in vs Tool Execution) อย่างชัดเจน
 
 ---
 

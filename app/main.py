@@ -2221,8 +2221,11 @@ async def get_index():
                             latencyTracker.geminiTurnComplete = performance.now();
                             logMilestone("🏁 GEMINI TURN COMPLETE", "Gemini Live API marked turnComplete=true");
                         }} else if (msg.event === 'clear') {{
-
-                            log('Detected user barge-in! Stopping bot playback.', 'system');
+                            if (msg.reason === 'tool_call') {{
+                                log('🛠️ Gemini Live: กำลังเรียกใช้ Tool / ค้นหาข้อมูล...', 'tool');
+                            }} else {{
+                                log('Detected user barge-in! Stopping bot playback.', 'system');
+                            }}
                             player.clear();
                         }} else if (msg.event === 'end_call') {{
                             log('Gemini Live: end_call() invoked. วางสายอัตโนมัติเรียบร้อยแล้ว.', 'system');
@@ -2569,24 +2572,101 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                                 await twilio_ws.send_json(media_msg)
                                                 
                         elif "toolCall" in data:
-                            try:
-                                await client_ws.send_json({
-                                    "event": "clear",
-                                    "streamSid": None
-                                })
-                            except Exception:
-                                pass
                             tool_call = data["toolCall"]
                             function_calls = tool_call.get("functionCalls", [])
                             for fc in function_calls:
-                                if fc.get("name") == "transfer_call":
-                                    call_id = fc.get("id")
-                                    print(f"DEBUG: Gemini requested call transfer. ID: {call_id}", flush=True)
-                                    
+                                fn_name = fc.get("name")
+                                call_id = fc.get("id")
+                                args = fc.get("args", {})
+                                print(f"DEBUG: Gemini requested tool call '{fn_name}'. ID: {call_id}", flush=True)
+
+                                if fn_name == "query_knowledge":
+                                    result = gemini_client.execute_query_knowledge(args.get("query"))
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "end_call":
+                                    result = gemini_client.execute_end_call(args.get("reason"))
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "book_table":
+                                    result = gemini_client.execute_book_table(
+                                        name=args.get("name"),
+                                        phone=args.get("phone"),
+                                        date_time=args.get("date_time"),
+                                        guests=args.get("guests")
+                                    )
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "check_member_points":
+                                    result = gemini_client.execute_check_member_points(args.get("phone"))
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "send_sms_info":
+                                    result = gemini_client.execute_send_sms_info(args.get("phone"), args.get("info_type"))
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "check_reservation":
+                                    result = gemini_client.execute_check_reservation(args.get("phone"))
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "transfer_call":
                                     if session["call_sid"]:
                                         session["transferring"] = True
                                         
-                                        # Respond to Gemini tool call
                                         response_msg = {
                                             "toolResponse": {
                                                 "functionResponses": [
@@ -2602,7 +2682,6 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                         await gemini_ws.send(json.dumps(response_msg))
                                         print("DEBUG: Sent toolResponse to Gemini.", flush=True)
                                         
-                                        # Trigger Call Transfer via Twilio REST API in background thread
                                         print(f"DEBUG: Triggering Twilio call transfer for Call SID: {session['call_sid']}", flush=True)
                                         await asyncio.to_thread(twilio_client.transfer_call, session["call_sid"])
                                         break
@@ -2655,6 +2734,7 @@ async def handle_local_stream(client_ws: WebSocket):
         "audio_chunks_sent": 0,
         "vad_audio_chunks": None,
         "client_speaking": True,
+        "pending_end_call": False,
     }
     setup_event = asyncio.Event()
     
@@ -2874,6 +2954,16 @@ async def handle_local_stream(client_ws: WebSocket):
                                 session["turn_active"] = False
                                 session["client_speaking"] = True  # Start listening again
 
+                                if session.get("pending_end_call"):
+                                    logger.info(f"[TURN {session['turn_id']}] END_CALL pending -> scheduling hangup in 3.5s after turn complete")
+                                    async def delayed_hangup():
+                                        await asyncio.sleep(3.5)
+                                        try:
+                                            await client_ws.send_json({"event": "end_call"})
+                                        except Exception:
+                                            pass
+                                    asyncio.create_task(delayed_hangup())
+
                             if server_content.get("interrupted"):
                                 logger.info(
                                     f"[TURN {session['turn_id']}] INTERRUPTED / BARGE-IN"
@@ -2946,6 +3036,7 @@ async def handle_local_stream(client_ws: WebSocket):
                             try:
                                 await client_ws.send_json({
                                     "event": "clear",
+                                    "reason": "tool_call",
                                     "streamSid": None
                                 })
                             except Exception:
@@ -2960,6 +3051,7 @@ async def handle_local_stream(client_ws: WebSocket):
 
                                 if fn_name == "end_call":
                                     result = gemini_client.execute_end_call(args.get("reason"))
+                                    session["pending_end_call"] = True
                                     try:
                                         await client_ws.send_json({
                                             "event": "tool_info",
@@ -2980,13 +3072,6 @@ async def handle_local_stream(client_ws: WebSocket):
                                         }
                                     }
                                     await gemini_ws.send(json.dumps(tool_resp))
-                                    async def delayed_hangup():
-                                        await asyncio.sleep(3.0)
-                                        try:
-                                            await client_ws.send_json({"event": "end_call"})
-                                        except Exception:
-                                            pass
-                                    asyncio.create_task(delayed_hangup())
 
                                 elif fn_name == "book_table":
                                     result = gemini_client.execute_book_table(
@@ -3069,6 +3154,30 @@ async def handle_local_stream(client_ws: WebSocket):
                                             "event": "tool_info",
                                             "tool": "🔍 check_reservation",
                                             "target": args.get("phone", "การจอง"),
+                                            "description": result.get("message")
+                                        })
+                                    except Exception:
+                                        pass
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+
+                                elif fn_name == "query_knowledge":
+                                    query_text = args.get("query", "")
+                                    result = gemini_client.execute_query_knowledge(query_text)
+                                    try:
+                                        await client_ws.send_json({
+                                            "event": "tool_info",
+                                            "tool": "🔍 query_knowledge",
+                                            "target": query_text or "คลังความรู้",
                                             "description": result.get("message")
                                         })
                                     except Exception:
