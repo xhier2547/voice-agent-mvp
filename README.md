@@ -20,6 +20,7 @@
 - [x] **3. VAD + Turn Taking + Interruption (Barge-in)**
   - [x] **Noise Gate Filter (RMS Filter)**: ตัดขยะเสียงเงียบ ป้องกันการส่ง Silence Frame เพื่อให้ Gemini ตรวจจับการเริ่ม/หยุดพูดได้แม่นยำ (<200ms)
   - [x] **Barge-In Support**: เมื่อผู้ใช้พูดแทรกขณะ AI กำลังพูด ระบบจะหยุดเล่นเสียงทันทีและกลับมาฟังผู้ใช้โดยอัตโนมัติ
+  - [x] **Speech Cutoff Prevention**: ปรับปรุง VAD และการทำงานของลำโพงให้เล่นประโยคเสียงพูดของบอทจนจบประโยคเมื่อมี Tool Call/ end_call() ทำงาน ป้องกันปัญหาสะดุดและตัดจบกลางคัน
 
 - [x] **4. Speech Understanding & Agent Brain**
   - [x] ใช้ **Gemini 2.5 Flash Native Audio Model (`models/gemini-2.5-flash-native-audio-latest`)** ทำหน้าที่เป็นสมองหลักทั้งฟัง เข้าใจความหมาย และประมวลผลคำตอบ
@@ -47,6 +48,7 @@
 - [x] **8. Observability & Latency Monitoring**
   - [x] **Live Console Breakdown**: แสดงเวลาตอบกลับของ Gemini สดๆ บนหน้าเว็บ เช่น `🔊 [AI AUDIO STREAM] Gemini สตรีมเสียงสด (Latency: 180ms, 24kHz PCM)...`
   - [x] แสดง RAG Matching Source และ Tool Execution Log อย่างละเอียดแบบเรียลไทม์ พร้อมแยกประเภท Event (Barge-in vs Tool Execution) อย่างชัดเจน
+  - [x] **Unified Live Chat Log**: ปรับปรุงหน้าแชตให้แสดงผลเสียงพูดต่อเนื่องของผู้ใช้รวมอยู่ใน Bubble ก้อนเดียวกันให้อ่านง่าย พร้อมทั้งเปิดการถอดเสียงคำพูดตอบกลับของ AI (`outputTranscription`) มาแสดงในหน้าแชตและประวัติการโทรโต้ตอบแบบเรียลไทม์
 
 ---
 

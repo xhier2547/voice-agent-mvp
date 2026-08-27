@@ -56,15 +56,27 @@ def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_n
             "wifi_password": "DripAICoffeeGuest (ความเร็ว 500/500 Mbps)",
         }
 
+    promos_list = data.get("promotions", [])
+    promos_str = "\n".join([f"  • {p.get('name')}: {p.get('detail')}" for p in promos_list]) if promos_list else "  • ไม่มีโปรโมชั่นในขณะนี้"
+
+    faq_list = data.get("faq", [])
+    faq_str = "\n".join([f"  • ถาม: {f.get('question')}\n    ตอบ: {f.get('answer')}" for f in faq_list]) if faq_list else "  • ไม่มี"
+
     prompt = f"""คุณคือพนักงานบริการลูกค้าของ "{data.get('company_name', '')}"
 
 ตอบภาษาไทย สั้น กระชับ คุยอย่างเป็นธรรมชาติเหมือนเพื่อนมนุษย์คุยกันจริงๆ
 
-ข้อมูลร้าน:
+ข้อมูลร้านค้าและโปรโมชั่น (พร้อมตอบลูกค้าได้ทันทีใน 0.6 วินาทีโดยไม่ต้องเรียกใช้ Tool):
 - เวลาเปิด: {data.get('operating_hours', '')}
 - สถานที่: {data.get('location', '')}
-- เบอร์: {data.get('contact_number', '')}
-- Wi-Fi: {data.get('wifi_password', '')}"""
+- เบอร์ติดต่อ: {data.get('contact_number', '')}
+- Wi-Fi: {data.get('wifi_password', '')}
+
+โปรโมชั่นปัจจุบัน:
+{promos_str}
+
+คำถามพบบ่อย (FAQ):
+{faq_str}"""
 
     # Inject Customer Memory if exists
     caller_mem = get_caller_memory(caller_phone, caller_name)
@@ -73,11 +85,25 @@ def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_n
 
     prompt += """
 
-กฎเหล็กเพื่อความเสถียรและธรรมชาติของการคุยทางโทรศัพท์:
-1. ตอบสั้นมากๆ (ประโยคเดียวจบ 5-8 คำ) เพื่อลดความหน่วงในสตรีมเสียง
-2. ห้ามทวนคำถามลูกค้า ห้ามเว้นจังหวะวิเคราะห์ หรือบรรยายความคิดในใจเด็ดขาด
-3. **สำคัญมาก**: ห้ามพูดปิดท้ายประโยคด้วยประโยคสำเร็จรูปเดิมๆ เช่น "มีอะไรให้ช่วยอีกไหมคะ/ครับ" ในทุกๆ ประโยคเด็ดขาด มันดูเป็นหุ่นยนต์ ให้ถามต่อเมื่อลูกค้าคุยธุระนั้นๆ จบแล้วจริงๆ หรือเกิดความเงียบเท่านั้น
-4. ใช้ Tools ทันทีเมื่อลูกค้าต้องการจองโต๊ะ วางสาย หรือเช็กแต้ม"""
+กฎเหล็กควบคุมขอบเขตบทสนทนา (Strict Guardrails & Focus):
+1. **รักษาบทบาทและขอบเขตบริการ**: คุณคือพนักงานบริการของร้าน DripAI Coffee & Space ให้ข้อมูลเฉพาะเรื่องที่เกี่ยวกับร้าน (เวลาเปิด-ปิด, สถานที่, เมนู, โปรโมชั่น, การจองโต๊ะ, สมาชิก และการโอนสาย) เท่านั้น
+2. **จัดการการพูดออกนอกเรื่อง (Off-Topic Steering)**: หากลูกค้าชวนคุยเรื่องทั่วไปที่ไม่เกี่ยวกับร้าน (เช่น ดินฟ้าอากาศ, การเมือง, ข่าวสาร) ให้ตอบรับสั้นๆ สุภาพ แล้วดึงบทสนทนากลับเข้าเรื่องบริการของร้านทันที เช่น "เรื่องนั้นน่าสนใจมากเลยค่ะ! แต่สำหรับวันนี้หากต้องการสอบถามข้อมูลร้านหรือจองโต๊ะ DripAI ยินดีดูแลให้อย่างเต็มที่เลยค่ะ"
+3. **ป้องกันข้อมูลเท็จ (No Hallucination)**: หากเป็นข้อมูลเฉพาะที่ไม่มีในระบบ ให้ใช้ Tool `query_knowledge` ค้นหาก่อน หรือเสนอโอนสายไปหาเจ้าหน้าที่มนุษย์ด้วย `transfer_call`
+
+เทคนิคการสนทนาให้ลื่นไหลและเป็นธรรมชาติ (Natural Conversational Voice Persona):
+1. **ใช้คำเกริ่นตอบรับอย่างเป็นธรรมชาติ (Active Listening & Empathy)**: เริ่มต้นด้วยคำตอบรับที่แสดงอารมณ์ร่วมและใส่ใจ เช่น "ฟังดูน่าสนใจมากเลยค่ะ!", "ยินดีเลยค่ะ!", "ได้เลยครับ!", "ยินดีด้วยนะคะ!", "ยอดเยี่ยมเลยค่ะ!"
+2. **ชวนคุยและช่วยเหลืออย่างเป็นมิตร (Contextual Engagement)**: แสดงความเข้าใจต่อสิ่งที่ลูกค้าเล่า แล้วถามคำถามเจาะจงเพื่อนำเสนอทางเลือกหรือช่วยเหลือต่ออย่างเป็นธรรมชาติ
+3. **หลีกเลี่ยงภาษาหุ่นยนต์และสคริปต์แข็งๆ**: ห้ามพูดทวนคำถามลูกค้า ห้ามใช้ประโยคสำเร็จรูปปิดท้ายเดิมๆ เช่น "มีอะไรให้ช่วยอีกไหมคะ" ให้ชวนคุยต่อตามเนื้อหาจริงเท่านั้น
+4. **ความยาวกระชับลงตัว (1-2 ประโยค)**: ตอบ 1-2 ประโยคกระชับลงตัว ไม่สั้นจนห้วนเป็นหุ่นยนต์ และไม่ยาวจนเกิดความหน่วงในสตรีมเสียง
+5. **เรียกใช้ Tools ทันทีพร้อมคำเกริ่น**: เมื่อลูกค้าต้องการจองโต๊ะ วางสาย หรือเช็กแต้ม ให้เรียกใช้ Tool ทันที
+6. **การรับมือคำตอบรับสั้นๆ (Backchannel Handling)**: หากลูกค้าพูดคำรับสั้นๆ เช่น "ครับ", "ค่ะ", "อ๋อ", "โอเค" ระหว่างสนทนา ให้ตอบรับสั้นๆ เช่น "ครับผม" หรือ "ค่ะ" แล้วดำเนินบทสนทนาต่ออย่างลื่นไหล ห้ามตกใจหรือค้างประมวลผลนาน
+
+กฎเหล็กสำหรับการจบสาย (End Call - Anti Loop):
+- เมื่อลูกค้าพูดว่า "ไม่มีอะไรแล้ว", "ไม่มีอะไรถามแล้ว", "พอแค่นี้", "ขอบคุณนะ", "ลาก่อน" หรือแสดงเจตนาจบสนทนา ให้ทำตามขั้นตอนนี้ **เพียงครั้งเดียว**:
+  1. พูดขอบคุณสั้นๆ ไม่เกิน 1 ประโยค เช่น "ขอบคุณที่โทรมาค่ะ DripAI ยินดีให้บริการเสมอค่ะ"
+  2. เรียก end_call() ทันทีหลังพูดจบ
+- **ห้ามพูดขอบคุณซ้ำเด็ดขาด** ห้ามเริ่มประโยคขอบคุณใหม่หลังจากพูดจบแล้ว ไม่ว่าจะเกิดอะไรขึ้น
+- **ห้ามถามซ้ำ** ว่า "มีอะไรอีกไหม" หลังจากลูกค้าบอกว่าไม่มีแล้ว"""
     return prompt
 
 def build_setup_message(system_instruction: str) -> dict:
@@ -109,6 +135,8 @@ def build_setup_message(system_instruction: str) -> dict:
                     "silenceDurationMs": 200
                 }
             },
+            "inputAudioTranscription": {},
+            "outputAudioTranscription": {},
 
             "systemInstruction": {
                 "parts": [
@@ -216,29 +244,37 @@ def execute_end_call(reason: str = None) -> dict:
 
 def execute_book_table(name: str, phone: str, date_time: str, guests: int, res_path: str = "data/reservations.json") -> dict:
     """
-    Executes table reservation action and saves record to reservations.json.
+    Executes table reservation action and saves record to reservations.json in non-blocking background thread.
     """
     try:
-        try:
-            with open(res_path, "r", encoding="utf-8") as f:
-                res_list = json.load(f)
-        except Exception:
-            res_list = []
-
+        guests_cnt = guests or 2
         new_res = {
-            "id": f"RES-{1001 + len(res_list)}",
+            "id": f"RES-{1001 + int(time.time() * 1000) % 9000}",
             "name": name or "ลูกค้า",
             "phone": phone or "081-234-5678",
             "date_time": date_time,
-            "guests": guests or 2,
-            "type": "ห้องประชุมส่วนตัว" if guests > 6 else "โต๊ะอาหารทั่วไป",
+            "guests": guests_cnt,
+            "type": "ห้องประชุมส่วนตัว" if guests_cnt > 6 else "โต๊ะอาหารทั่วไป",
             "created_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        res_list.append(new_res)
-        with open(res_path, "w", encoding="utf-8") as f:
-            json.dump(res_list, f, ensure_ascii=False, indent=2)
-        logger.info(f"Booked table successfully for {name}")
-        return {"status": "success", "reservation": new_res, "message": f"จองโต๊ะให้คุณ {name} สำหรับ {guests} ท่าน วันที่ {date_time} เรียบร้อยแล้วค่ะ"}
+
+        import threading
+        def _bg_save():
+            try:
+                try:
+                    with open(res_path, "r", encoding="utf-8") as f:
+                        res_list = json.load(f)
+                except Exception:
+                    res_list = []
+                res_list.append(new_res)
+                with open(res_path, "w", encoding="utf-8") as f:
+                    json.dump(res_list, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.error(f"Failed to async save reservation: {e}")
+
+        threading.Thread(target=_bg_save, daemon=True).start()
+        logger.info(f"Booked table successfully for {name} (Async Non-blocking)")
+        return {"status": "success", "reservation": new_res, "message": f"จองโต๊ะให้คุณ {name} สำหรับ {guests_cnt} ท่าน วันที่ {date_time} เรียบร้อยแล้วค่ะ"}
     except Exception as e:
         logger.error(f"Failed to book table: {e}")
         return {"status": "error", "message": str(e)}
@@ -330,7 +366,7 @@ def execute_send_sms_info(phone: str, info_type: str) -> dict:
 
 class VectorRAGStore:
     """
-    Vector Database RAG Engine powered by ChromaDB & Semantic Vector Space Matching.
+    Vector Database RAG Engine powered by ChromaDB & Semantic Vector Space Matching with In-Memory Cache.
     """
     def __init__(self, storage_dir: str = "data/chroma_db"):
         self.storage_dir = storage_dir
@@ -338,6 +374,7 @@ class VectorRAGStore:
         self.collection = None
         self.documents = []
         self.metadatas = []
+        self.cache = {}
         self._init_chroma()
 
     def _init_chroma(self):
@@ -354,6 +391,7 @@ class VectorRAGStore:
         """
         Extracts, embeds, and indexes all business knowledge into the Vector Database.
         """
+        self.cache.clear()
         try:
             with open(knowledge_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -412,8 +450,17 @@ class VectorRAGStore:
 
     def query(self, query_text: str) -> dict:
         """
-        Performs Semantic Search on the Vector Database and returns the top matching section & content.
+        Performs Semantic Search on the Vector Database with In-Memory Cache.
         """
+        cache_key = (query_text or "").strip().lower()
+        if cache_key in self.cache:
+            cached = dict(self.cache[cache_key])
+            cached["method"] = "In-Memory Fast Cache (<0.1ms)"
+            cached["cache_hit"] = True
+            logger.info(f"RAG Cache HIT for query '{query_text}' -> {cached.get('section')}")
+            return cached
+
+        res_dict = None
         if not self.documents:
             self.sync_knowledge()
 
@@ -429,17 +476,24 @@ class VectorRAGStore:
                     dist = res["distances"][0][0] if "distances" in res and res["distances"] else 0.5
                     sim_pct = round(max(10.0, min(99.9, (1.0 - dist) * 100)), 1)
                     
-                    return {
+                    res_dict = {
                         "section": matched_meta.get("section", "ChromaDB Vector Match"),
                         "content": matched_doc,
                         "file": "data/chroma_db (Chroma Vector DB)",
                         "method": "Vector Embeddings (ChromaDB)",
-                        "similarity": f"{sim_pct}%"
+                        "similarity": f"{sim_pct}%",
+                        "cache_hit": False
                     }
             except Exception as e:
                 logger.warning(f"ChromaDB query fallback: {e}")
 
-        return self._vector_space_fallback(query_text)
+        if not res_dict:
+            res_dict = self._vector_space_fallback(query_text)
+
+        if cache_key:
+            self.cache[cache_key] = res_dict
+
+        return res_dict
 
     def _vector_space_fallback(self, query_text: str) -> dict:
         if not self.documents:

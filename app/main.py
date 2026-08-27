@@ -1348,21 +1348,25 @@ async def get_index():
                 return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
             }}
 
+            let activeUserMessageBody = null;
+            let activeBotMessageBody = null;
+
             function addChatMessage(text, sender) {{
                 if (!chatMessages) return;
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `chat-msg ${{sender}}`;
                 
                 if (sender === 'user') {{
-                    msgDiv.innerHTML = `<strong>👤 คุณ:</strong> ${{escapeHtml(text)}}`;
+                    msgDiv.innerHTML = `<strong>👤 คุณ:</strong> <span class="user-text-body">${{escapeHtml(text)}}</span>`;
                 }} else if (sender === 'bot') {{
-                    msgDiv.innerHTML = `<strong>🤖 Gemini:</strong> ${{escapeHtml(text)}}`;
+                    msgDiv.innerHTML = `<strong>🤖 Gemini:</strong> <span class="bot-text-body">${{escapeHtml(text)}}</span>`;
                 }} else {{
                     msgDiv.textContent = text;
                 }}
                 
                 chatMessages.appendChild(msgDiv);
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+                return msgDiv;
             }}
 
             function sendTextMessage() {{
@@ -1383,16 +1387,18 @@ async def get_index():
                 }});
             }}
             
-            function logRagMatch(query, section, content, file) {{
+            function logRagMatch(query, section, content, file, method, duration_ms) {{
                 const time = new Date().toLocaleTimeString();
                 const container = document.createElement('div');
                 container.className = 'console-rag';
+                const speedTag = duration_ms ? `<span style="color:#10b981; font-weight:bold; margin-left:6px;">[${{duration_ms}}ms]</span>` : '';
                 container.innerHTML = `
-                    <div class="rag-header"><span class="console-time">[${{time}}]</span> 🧠 <strong>RAG KNOWLEDGE MATCHED</strong></div>
+                    <div class="rag-header"><span class="console-time">[${{time}}]</span> 🧠 <strong>RAG KNOWLEDGE MATCHED</strong> ${{speedTag}}</div>
                     <div class="rag-body">
                         <div><span class="rag-tag">🔍 คำถามที่พบ:</span> "${{escapeHtml(query)}}"</div>
                         <div><span class="rag-tag">📁 ดึงจากหมวดหมู่:</span> <strong>${{escapeHtml(section)}}</strong></div>
                         <div><span class="rag-tag">📄 ข้อมูลในคลัง (RAG Content):</span> "${{escapeHtml(content)}}"</div>
+                        <div><span class="rag-tag">⚡ วิธีการค้นหา:</span> <strong style="color:#10b981">${{escapeHtml(method || 'Vector RAG')}}</strong></div>
                         <div><span class="rag-tag">💾 ไฟล์แหล่งอ้างอิง:</span> <code style="color:#818cf8">${{escapeHtml(file)}}</code></div>
                     </div>
                 `;
@@ -2100,6 +2106,9 @@ async def get_index():
                         }};
 
                         let lastSpeechTimestamp = 0;
+                        let consecutiveSpeechFrames = 0;
+                        let postSpeechSendUntil = 0; // Timestamp: keep sending audio until this time after speech ends
+                        let turnPending = false; // Prevent overlapping turns
 
                         // Recorder Process Node (ScriptProcessorNode) - 1024 buffer size for 20ms ultra-low latency
                         scriptNode = audioContext.createScriptProcessor(1024, 1, 1);
@@ -2119,47 +2128,77 @@ async def get_index():
                                 const rms = Math.sqrt(sum / inputData.length);
                                 const now = performance.now();
 
-                                const SPEECH_THRESHOLD = 0.015;
+                                const isBotPlaying = (player && player.activeSources && player.activeSources.length > 0);
+                                const SPEECH_THRESHOLD = isBotPlaying ? 0.08 : 0.02;
                                 if (rms > SPEECH_THRESHOLD) {{
+                                    consecutiveSpeechFrames++;
                                     lastSpeechTimestamp = now;
-                                    if (!latencyTracker.isSpeaking) {{
+                                    // Reset trailing timer when user resumes speaking
+                                    postSpeechSendUntil = 0;
+                                    // Require sustained speech (> 60ms / 3 consecutive frames) to trigger turn start & barge-in
+                                    if (!latencyTracker.isSpeaking && consecutiveSpeechFrames >= 3) {{
                                         latencyTracker.isSpeaking = true;
-                                        resetTurnMetrics();
-                                        latencyTracker.speechStart = now;
-                                        if (ws && ws.readyState === WebSocket.OPEN) {{
-                                            ws.send(JSON.stringify({{ event: 'turn_start' }}));
+                                        // Instant Local Barge-in: Clear player speakers when sustained speech detected
+                                        if (player && player.activeSources && player.activeSources.length > 0) {{
+                                            player.clear();
+                                            if (ws && ws.readyState === WebSocket.OPEN) {{
+                                                ws.send(JSON.stringify({{ event: 'clear', reason: 'barge_in' }}));
+                                            }}
+                                            log('🎙️ Sustained Speech Interruption: Stopped AI playback on user speech start', 'system');
                                         }}
-                                        logMilestone("🎙️ SPEECH START", `User started speaking (RMS > ${SPEECH_THRESHOLD})`);
+                                        // Only create new turn if no pending turn waiting for Gemini response
+                                        if (!turnPending) {{
+                                            resetTurnMetrics();
+                                            latencyTracker.speechStart = now - 60;
+                                            turnPending = true;
+                                            if (ws && ws.readyState === WebSocket.OPEN) {{
+                                                ws.send(JSON.stringify({{ event: 'turn_start' }}));
+                                            }}
+                                            logMilestone("🎙️ SPEECH START", `User started speaking (sustained speech > 60ms, RMS > ${{SPEECH_THRESHOLD}})`);
+                                        }}
                                     }}
                                     if (latencyTracker.silenceTimer) {{
                                         clearTimeout(latencyTracker.silenceTimer);
                                         latencyTracker.silenceTimer = null;
                                     }}
-                                }} else if (latencyTracker.isSpeaking && !latencyTracker.silenceTimer) {{
-                                    // Silence detected: start VAD hangover window (600ms)
-                                    latencyTracker.silenceTimer = setTimeout(() => {{
-                                        const silenceNow = performance.now();
-                                        latencyTracker.isSpeaking = false;
-                                        latencyTracker.speechEnd = silenceNow - 600;
-                                        latencyTracker.vadEnd = silenceNow;
-                                        logMilestone("⏹️ SPEECH END", "Silence detected for 600ms hangover window");
-                                        logMilestone("⏹️ CLIENT VAD END", "Browser detected 600ms silence");
+                                }} else {{
+                                    consecutiveSpeechFrames = 0;
+                                    if (latencyTracker.isSpeaking && !latencyTracker.silenceTimer) {{
+                                        // Silence detected: optimized VAD hangover window (300ms)
+                                        latencyTracker.silenceTimer = setTimeout(() => {{
+                                            const silenceNow = performance.now();
+                                            latencyTracker.isSpeaking = false;
+                                            latencyTracker.speechEnd = silenceNow - 300;
+                                            latencyTracker.vadEnd = silenceNow;
+                                            logMilestone("⏹️ SPEECH END", "Silence detected for 300ms hangover window");
+                                            logMilestone("⏹️ CLIENT VAD END", "Browser detected 300ms silence");
 
-                                        if (ws && ws.readyState === WebSocket.OPEN) {{
-                                            ws.send(JSON.stringify({{
-                                                event: 'vad_end',
-                                                timestamp: silenceNow
-                                            }}));
-                                        }}
-                                        latencyTracker.silenceTimer = null;
-                                    }}, 600);
+                                            if (ws && ws.readyState === WebSocket.OPEN) {{
+                                                ws.send(JSON.stringify({{
+                                                    event: 'vad_end',
+                                                    timestamp: silenceNow
+                                                }}));
+                                            }}
+                                            // Start trailing silence window: send 2 more seconds of silence frames
+                                            // so Gemini Native VAD can confirm end-of-speech
+                                            postSpeechSendUntil = silenceNow + 2000;
+                                            latencyTracker.silenceTimer = null;
+                                        }}, 300);
 
+                                    }}
                                 }}
                                 
-                                const resampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
-                                const pcm16 = floatTo16BitPCM(resampled);
-                                const base64 = arrayBufferToBase64(pcm16);
-                                ws.send(JSON.stringify({{ event: 'audio', data: base64 }}));
+                                // Smart Trailing Silence Gate:
+                                // Send audio during: (1) active speech, (2) VAD hangover, (3) 2s post-speech trailing
+                                // Stop sending after trailing window expires to prevent Context Bloat
+                                const inTrailingWindow = postSpeechSendUntil > 0 && now < postSpeechSendUntil;
+                                const shouldSendAudio = latencyTracker.isSpeaking || latencyTracker.silenceTimer || inTrailingWindow;
+                                if (shouldSendAudio) {{
+                                    const resampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
+                                    const pcm16 = floatTo16BitPCM(resampled);
+                                    const base64 = arrayBufferToBase64(pcm16);
+                                    ws.send(JSON.stringify({{ event: 'audio', data: base64 }}));
+                                }}
                             }}
                         }};
                         
@@ -2182,16 +2221,27 @@ async def get_index():
                                 if (phonePreview) phonePreview.textContent = '🤖 Gemini: พร้อมรับสายแล้วครับ...';
                             }}
                         }} else if (msg.event === 'text') {{
+                            activeUserMessageBody = null; // Reset user active bubble when bot speaks
                             if (!latencyTracker.hasFirstResponseForTurn) {{
                                 latencyTracker.hasFirstResponseForTurn = true;
                                 latencyTracker.geminiFirstResponse = performance.now();
                                 logMilestone("📥 GEMINI FIRST RESPONSE", "First text/content response received from Gemini Live API");
                             }}
-                            addChatMessage(msg.text, 'bot');
+                            if (!activeBotMessageBody) {{
+                                const msgDiv = addChatMessage(msg.text, 'bot');
+                                activeBotMessageBody = msgDiv ? msgDiv.querySelector('.bot-text-body') : null;
+                            }} else {{
+                                const currentText = activeBotMessageBody.textContent.trim();
+                                if (msg.text.startsWith(currentText) && currentText !== "") {{
+                                    activeBotMessageBody.textContent = msg.text;
+                                }} else {{
+                                    activeBotMessageBody.textContent += msg.text;
+                                }}
+                            }}
                             log('🤖 Gemini: ' + msg.text, 'gemini');
-                            if (phonePreview) phonePreview.textContent = '🤖 Gemini: ' + msg.text;
+                            if (phonePreview && activeBotMessageBody) phonePreview.textContent = '🤖 Gemini: ' + activeBotMessageBody.textContent;
                         }} else if (msg.event === 'rag_info') {{
-                            logRagMatch(msg.query, msg.section, msg.content, msg.file);
+                            logRagMatch(msg.query, msg.section, msg.content, msg.file, msg.method, msg.duration_ms);
                         }} else if (msg.event === 'tool_info') {{
                             logToolExecution(msg.tool, msg.target, msg.description);
                             if (typeof loadCustomerHistory === 'function') loadCustomerHistory();
@@ -2219,14 +2269,53 @@ async def get_index():
                             }}, 2000);
                         }} else if (msg.event === 'turn_complete') {{
                             latencyTracker.geminiTurnComplete = performance.now();
+                            turnPending = false;
+                            activeBotMessageBody = null; // Next response starts a new bubble
+                            activeUserMessageBody = null; // Reset user active bubble for the next turn
                             logMilestone("🏁 GEMINI TURN COMPLETE", "Gemini Live API marked turnComplete=true");
+                        }} else if (msg.event === 'user_transcript') {{
+                            activeBotMessageBody = null; // Reset bot active bubble when user speaks
+                            if (!activeUserMessageBody) {{
+                                const msgDiv = addChatMessage(msg.text, 'user');
+                                activeUserMessageBody = msgDiv ? msgDiv.querySelector('.user-text-body') : null;
+                            }} else {{
+                                const currentText = activeUserMessageBody.textContent.trim();
+                                if (msg.text.startsWith(currentText) && currentText !== "") {{
+                                    activeUserMessageBody.textContent = msg.text;
+                                }} else {{
+                                    activeUserMessageBody.textContent += (msg.text.startsWith(' ') || currentText.endsWith(' ') ? '' : ' ') + msg.text;
+                                }}
+                            }}
+                            if (phonePreview && activeUserMessageBody) phonePreview.textContent = '🎤 ลูกค้า: ' + activeUserMessageBody.textContent;
+                        }} else if (msg.event === 'ai_transcript') {{
+                            activeUserMessageBody = null; // Reset user active bubble when bot speaks
+                            if (!latencyTracker.hasFirstResponseForTurn) {{
+                                latencyTracker.hasFirstResponseForTurn = true;
+                                latencyTracker.geminiFirstResponse = performance.now();
+                                logMilestone("📥 GEMINI FIRST RESPONSE", "First AI transcript response received");
+                            }}
+                            if (!activeBotMessageBody) {{
+                                const msgDiv = addChatMessage(msg.text, 'bot');
+                                activeBotMessageBody = msgDiv ? msgDiv.querySelector('.bot-text-body') : null;
+                            }} else {{
+                                const currentText = activeBotMessageBody.textContent.trim();
+                                if (msg.text.startsWith(currentText) && currentText !== "") {{
+                                    activeBotMessageBody.textContent = msg.text;
+                                }} else {{
+                                    activeBotMessageBody.textContent += msg.text;
+                                }}
+                            }}
+                            log('🤖 Gemini: ' + msg.text, 'gemini');
+                            if (phonePreview && activeBotMessageBody) phonePreview.textContent = '🤖 Gemini: ' + activeBotMessageBody.textContent;
                         }} else if (msg.event === 'clear') {{
+                            activeBotMessageBody = null;
+                            activeUserMessageBody = null;
                             if (msg.reason === 'tool_call') {{
                                 log('🛠️ Gemini Live: กำลังเรียกใช้ Tool / ค้นหาข้อมูล...', 'tool');
                             }} else {{
                                 log('Detected user barge-in! Stopping bot playback.', 'system');
+                                player.clear();
                             }}
-                            player.clear();
                         }} else if (msg.event === 'end_call') {{
                             log('Gemini Live: end_call() invoked. วางสายอัตโนมัติเรียบร้อยแล้ว.', 'system');
                             closePhoneModal();
@@ -2862,9 +2951,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                     session["audio_chunks_sent"] += 1
 
                                 try:
-                                    asyncio.create_task(
-                                        asyncio.to_thread(recorder.add_user_audio, pcm_b64)
-                                    )
+                                    recorder.add_user_audio(pcm_b64)
                                 except Exception as e:
                                     logger.warning(
                                         f"Recorder user audio failed: {e}"
@@ -2884,6 +2971,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                         "section": rag_match["section"],
                                         "content": rag_match["content"],
                                         "file": rag_match["file"],
+                                        "method": rag_match.get("method", "Vector RAG"),
                                         "duration_ms": rag_ms
                                     })
                                 except Exception:
@@ -2918,16 +3006,39 @@ async def handle_local_stream(client_ws: WebSocket):
                             print("DEBUG: Gemini Live API setup complete for local stream.", flush=True)
                             setup_event.set()
                             await client_ws.send_json({"event": "status", "text": "Ready to chat! Start speaking..."})
-                            
+
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
+
+                            if "inputTranscription" in server_content:
+                                transcript = server_content["inputTranscription"].get("text", "").strip()
+                                if transcript:
+                                    try:
+                                        await client_ws.send_json({
+                                            "event": "user_transcript",
+                                            "text": transcript
+                                        })
+                                    except Exception:
+                                        pass
+
+                            if "outputTranscription" in server_content:
+                                transcript = server_content["outputTranscription"].get("text", "").strip()
+                                if transcript:
+                                    try:
+                                        await client_ws.send_json({
+                                            "event": "ai_transcript",
+                                            "text": transcript
+                                        })
+                                    except Exception:
+                                        pass
 
                             if (
                                 session["turn_active"]
                                 and session["gemini_first_ms"] is None
                             ):
                                 session["gemini_first_ms"] = now_ms()
-                                session["client_speaking"] = False  # Stop forwarding mic while bot is speaking
+                                # Keep continuous audio streaming to Gemini so server-side VAD can detect barge-in
+                                session["client_speaking"] = True
                                 
                                 latency = 0
                                 if session["speech_end_ms"] is not None:
@@ -3026,9 +3137,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                             break
 
                                         try:
-                                            asyncio.create_task(
-                                                asyncio.to_thread(recorder.add_bot_audio, pcm_24k_b64)
-                                            )
+                                            recorder.add_bot_audio(pcm_24k_b64)
                                         except Exception as e:
                                             logger.warning(f"Recorder output failed: {e}")
                                         
