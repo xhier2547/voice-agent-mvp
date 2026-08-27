@@ -2626,6 +2626,20 @@ async def handle_media_stream(twilio_ws: WebSocket):
                         if "setupComplete" in data:
                             print("DEBUG: Gemini Live API setup complete.", flush=True)
                             setup_event.set()
+                            # Trigger initial welcoming greeting for Twilio
+                            greeting_prompt = "กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน DripAI Coffee & Space (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
+                            trigger_msg = {
+                                "clientContent": {
+                                    "turns": [
+                                        {
+                                            "role": "user",
+                                            "parts": [{"text": greeting_prompt}]
+                                        }
+                                    ],
+                                    "turnComplete": True
+                                }
+                            }
+                            await gemini_ws.send(json.dumps(trigger_msg))
                             
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
@@ -3006,6 +3020,20 @@ async def handle_local_stream(client_ws: WebSocket):
                             print("DEBUG: Gemini Live API setup complete for local stream.", flush=True)
                             setup_event.set()
                             await client_ws.send_json({"event": "status", "text": "Ready to chat! Start speaking..."})
+                            # Trigger initial welcoming greeting for local stream
+                            greeting_prompt = "กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน DripAI Coffee & Space (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
+                            trigger_msg = {
+                                "clientContent": {
+                                    "turns": [
+                                        {
+                                            "role": "user",
+                                            "parts": [{"text": greeting_prompt}]
+                                        }
+                                    ],
+                                    "turnComplete": True
+                                }
+                            }
+                            await gemini_ws.send(json.dumps(trigger_msg))
 
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
