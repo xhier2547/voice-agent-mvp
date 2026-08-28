@@ -1,5 +1,3 @@
-from IPython.core import magic_arguments
-from IPython.core import magic_arguments
 import json
 import asyncio
 import logging
@@ -61,7 +59,62 @@ async def get_recording_api(filename: str):
         return FileResponse(filepath, media_type="audio/wav")
     return JSONResponse({"status": "error", "message": "Recording file not found"}, status_code=404)
 
-def save_call_log(phone: str, caller_name: str, summary: str = None, recording_file: str = None):
+import urllib.request
+import urllib.error
+
+def generate_conversation_summary(transcript_list: list) -> str:
+    """
+    Generates a summary of the conversation using Gemini 1.5 Flash REST API.
+    """
+    if not transcript_list:
+        return "ไม่มีบันทึกการสนทนา"
+        
+    # Format transcript for prompt
+    formatted_transcript = ""
+    for turn in transcript_list:
+        role = "ลูกค้า (User)" if turn.get("role") == "user" else "ผู้ช่วย AI (Gemini)"
+        text = turn.get("text", "")
+        formatted_transcript += f"{role}: {text}\n"
+        
+    prompt = (
+        "ต่อไปนี้คือบทสนทนาระหว่างลูกค้าและผู้ช่วย AI ทางโทรศัพท์ของร้าน DripAI Coffee & Space "
+        "โปรดสรุปความต้องการของลูกค้าและข้อสรุปการสนทนาสั้นๆ กระชับ เป็นภาษาไทย (ความยาวไม่เกิน 1-2 ประโยค):\n\n"
+        f"{formatted_transcript}"
+    )
+    
+    try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={config.GEMINI_API_KEY}"
+        req_data = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt}
+                    ]
+                }
+            ]
+        }
+        req_body = json.dumps(req_data).encode("utf-8")
+        req = urllib.request.Request(
+            url,
+            data=req_body,
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=8) as response:
+            res_data = json.loads(response.read().decode("utf-8"))
+            candidates = res_data.get("candidates", [])
+            if candidates:
+                content = candidates[0].get("content", {})
+                parts = content.get("parts", [])
+                if parts:
+                    summary_text = parts[0].get("text", "").strip()
+                    if summary_text:
+                        return summary_text
+    except Exception as e:
+        logger.error(f"Error generating transcript summary: {e}")
+        
+    return "ลูกค้าสนทนากับระบบผู้ช่วยเสียง"
+
+def save_call_log(phone: str, caller_name: str, summary: str = None, recording_file: str = None, duration_sec: float = 0.0, transcript: list = None, tools_called: list = None):
     try:
         try:
             with open("data/call_logs.json", "r", encoding="utf-8") as f:
@@ -93,12 +146,16 @@ def save_call_log(phone: str, caller_name: str, summary: str = None, recording_f
         logs[phone_key]["history"].append({
             "timestamp": now_str,
             "topic": "บันทึกการโทรสนทนาโต้ตอบสด",
-            "recording_file": recording_file
+            "recording_file": recording_file,
+            "duration_sec": round(duration_sec, 1),
+            "summary": summary or "ลูกค้าเข้าชมระบบและสนทนากับระบบผู้ช่วยเสียง",
+            "transcript": transcript or [],
+            "tools_called": tools_called or []
         })
 
         with open("data/call_logs.json", "w", encoding="utf-8") as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved call log & audio recording for {phone_key}: {recording_file}")
+        logger.info(f"Saved call log, summary & transcript for {phone_key}: {recording_file}")
     except Exception as e:
         logger.error(f"Error saving call log: {e}")
 
@@ -190,7 +247,7 @@ async def handle_media_stream(twilio_ws: WebSocket):
     await twilio_ws.accept()
     print("DEBUG: Accepted Twilio WebSocket connection.", flush=True)
     
-    phone = twilio_ws.query_params.get("phone")
+    phone = twilio_ws.query_params.get("phone", "081-234-5678")
     print(f"DEBUG: Twilio WebSocket connected. Caller Phone from query param: {phone}", flush=True)
     
     if not config.GEMINI_API_KEY or "PLACEHOLDER" in config.GEMINI_API_KEY:
@@ -206,6 +263,19 @@ async def handle_media_stream(twilio_ws: WebSocket):
         "transferring": False
     }
     
+    # Transcript & Stats Instrumentation
+    start_time = time.time()
+    transcript_history = []
+    tools_called = []
+    caller_name = "ลูกค้า"
+    try:
+        with open("data/call_logs.json", "r", encoding="utf-8") as f:
+            logs = json.load(f)
+            if phone in logs:
+                caller_name = logs[phone].get("caller_name", "ลูกค้า")
+    except Exception:
+        pass
+
     setup_event = asyncio.Event()
     
     try:
@@ -213,7 +283,7 @@ async def handle_media_stream(twilio_ws: WebSocket):
             print("DEBUG: Connected to Gemini Live API WebSocket.", flush=True)
             
             # Send initial setup message first with customer memory!
-            sys_instruction = gemini_client.get_system_instruction(caller_phone=phone)
+            sys_instruction = gemini_client.get_system_instruction(caller_phone=phone, caller_name=caller_name)
             setup_msg = gemini_client.build_setup_message(sys_instruction)
             await gemini_ws.send(json.dumps(setup_msg))
             print("DEBUG: Sent setup message to Gemini with Twilio memory.", flush=True)
@@ -294,6 +364,24 @@ async def handle_media_stream(twilio_ws: WebSocket):
                         elif "serverContent" in data:
                             server_content = data["serverContent"]
                             
+                            # Capture Transcripts for history logging
+                            if "inputTranscription" in server_content:
+                                transcript = server_content["inputTranscription"].get("text", "").strip()
+                                if transcript:
+                                    transcript_history.append({
+                                        "role": "user",
+                                        "text": transcript,
+                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                    })
+                            if "outputTranscription" in server_content:
+                                transcript = server_content["outputTranscription"].get("text", "").strip()
+                                if transcript:
+                                    transcript_history.append({
+                                        "role": "model",
+                                        "text": transcript,
+                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                    })
+
                             # Check for Barge-in (Interruption)
                             if server_content.get("interrupted"):
                                 print("DEBUG: Interruption detected (Barge-in)! Clearing Twilio buffers.", flush=True)
@@ -314,16 +402,17 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                     if inline_data and inline_data.get("mimeType", "").startswith("audio/pcm"):
                                         pcm_24k_b64 = inline_data.get("data")
                                         if session["stream_sid"]:
+                                            ulaw_b64, gemini_to_twilio_state = audio.gemini_to_twilio(pcm_24k_b64, gemini_to_twilio_state)
                                             if ulaw_b64:
                                                 media_msg = {
                                                     "event": "media",
                                                     "streamSid": session["stream_sid"],
                                                     "media": {
                                                         "payload": ulaw_b64
-                                                    }
+                                                     }
                                                 }
                                                 await twilio_ws.send_json(media_msg)
-                                                
+                                                 
                         elif "toolCall" in data:
                             tool_call = data["toolCall"]
                             function_calls = tool_call.get("functionCalls", [])
@@ -332,6 +421,8 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                 call_id = fc.get("id")
                                 args = fc.get("args", {})
                                 print(f"DEBUG: Gemini requested tool call '{fn_name}'. ID: {call_id}", flush=True)
+                                if fn_name not in tools_called:
+                                    tools_called.append(fn_name)
 
                                 if fn_name == "query_knowledge":
                                     result = gemini_client.execute_query_knowledge(args.get("query"))
@@ -452,10 +543,24 @@ async def handle_media_stream(twilio_ws: WebSocket):
         traceback.print_exc()
     finally:
         print("DEBUG: Cleaning up connections...", flush=True)
+        duration_sec = time.time() - start_time
         try:
             await twilio_ws.close()
         except Exception:
             pass
+        
+        # Save transcript and summary to logs
+        if transcript_history:
+            summary = generate_conversation_summary(transcript_history)
+            save_call_log(
+                phone=phone,
+                caller_name=caller_name,
+                summary=summary,
+                recording_file=None,
+                duration_sec=duration_sec,
+                transcript=transcript_history,
+                tools_called=tools_called
+            )
         print("DEBUG: WebSocket connections cleaned up.", flush=True)
 
 @app.websocket("/local-stream")
@@ -470,6 +575,10 @@ async def handle_local_stream(client_ws: WebSocket):
         return
         
     gemini_url = f"wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?key={config.GEMINI_API_KEY}"
+    
+    start_time = time.time()
+    transcript_history = []
+    tools_called = []
     
     session = {
         "transferring": False,
@@ -623,7 +732,15 @@ async def handle_local_stream(client_ws: WebSocket):
                         elif event == "text":
                             user_text = message.get("text")
                             if user_text:
-                                print(f"DEBUG User Text Input: {user_text}", flush=True)
+                                try:
+                                    print(f"DEBUG User Text Input: {user_text}", flush=True)
+                                except Exception:
+                                    pass
+                                transcript_history.append({
+                                    "role": "user",
+                                    "text": user_text,
+                                    "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                })
                                 try:
                                     t0_rag = time.perf_counter()
                                     rag_match = gemini_client.match_knowledge(user_text)
@@ -691,6 +808,11 @@ async def handle_local_stream(client_ws: WebSocket):
                             if "inputTranscription" in server_content:
                                 transcript = server_content["inputTranscription"].get("text", "").strip()
                                 if transcript:
+                                    transcript_history.append({
+                                        "role": "user",
+                                        "text": transcript,
+                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                    })
                                     try:
                                         await client_ws.send_json({
                                             "event": "user_transcript",
@@ -702,6 +824,11 @@ async def handle_local_stream(client_ws: WebSocket):
                             if "outputTranscription" in server_content:
                                 transcript = server_content["outputTranscription"].get("text", "").strip()
                                 if transcript:
+                                    transcript_history.append({
+                                        "role": "model",
+                                        "text": transcript,
+                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                    })
                                     try:
                                         await client_ws.send_json({
                                             "event": "ai_transcript",
@@ -779,7 +906,10 @@ async def handle_local_stream(client_ws: WebSocket):
                                     if text:
                                         clean_text = text.strip()
                                         if not (clean_text.startswith("**") or "I have identified" in clean_text or "Retrieving" in clean_text or "Gathering" in clean_text or "Confirming" in clean_text or "I've" in clean_text):
-                                            print(f"DEBUG Gemini Text: {clean_text}", flush=True)
+                                            try:
+                                                print(f"DEBUG Gemini Text: {clean_text}", flush=True)
+                                            except Exception:
+                                                pass
                                             try:
                                                 await client_ws.send_json({
                                                     "event": "text",
@@ -835,6 +965,8 @@ async def handle_local_stream(client_ws: WebSocket):
                                 call_id = fc.get("id")
                                 args = fc.get("args", {})
                                 logger.info(f"[TURN {session['turn_id']}] TOOL_CALL fn={fn_name} id={call_id}")
+                                if fn_name not in tools_called:
+                                    tools_called.append(fn_name)
 
                                 if fn_name == "end_call":
                                     result = gemini_client.execute_end_call(args.get("reason"))
@@ -1023,9 +1155,19 @@ async def handle_local_stream(client_ws: WebSocket):
         logger.exception(f"Error in local media stream relay: {e}")
     finally:
         logger.info("Cleaning up local connections...")
+        duration_sec = time.time() - start_time
         rec_file = recorder.save()
-        if rec_file:
-            save_call_log(phone=recorder.phone, caller_name=recorder.caller_name, recording_file=rec_file)
+        if transcript_history:
+            summary = generate_conversation_summary(transcript_history)
+            save_call_log(
+                phone=recorder.phone,
+                caller_name=recorder.caller_name,
+                summary=summary,
+                recording_file=rec_file,
+                duration_sec=duration_sec,
+                transcript=transcript_history,
+                tools_called=tools_called
+            )
         try:
             await client_ws.close()
         except Exception:

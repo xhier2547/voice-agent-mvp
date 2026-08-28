@@ -1185,9 +1185,14 @@
             <div class="topbar-title">
                 <h2 id="topbar-section-title">Dashboard Overview</h2>
             </div>
-            <div class="badge">
-                <span class="badge-dot"></span>
-                Local Testing Server
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button id="topbar-phone-btn" class="btn" style="padding: 7px 15px; font-size: 12.5px; display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.12); color: var(--primary-color); border: 1px solid rgba(59, 130, 246, 0.28); border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
+                    📱 หน้าจอโทรศัพท์ (Simulator)
+                </button>
+                <div class="badge">
+                    <span class="badge-dot"></span>
+                    Local Testing Server
+                </div>
             </div>
         </header>
 
@@ -1232,9 +1237,9 @@
                     <div class="chart-card">
                         <div class="chart-header">
                             <h3>Total Call Analysis</h3>
-                            <select class="chart-select">
-                                <option>Weekly</option>
-                                <option>Hourly</option>
+                            <select class="chart-select" id="analysis-timeframe-select">
+                                <option value="weekly">Weekly</option>
+                                <option value="hourly">Hourly</option>
                             </select>
                         </div>
                         <div class="chart-container">
@@ -1480,10 +1485,15 @@
                                     <label>เบอร์โทรศัพท์ (Phone Number):</label>
                                     <input type="tel" id="dialer-phone" value="081-234-5678" placeholder="08X-XXX-XXXX">
                                 </div>
-                                <button id="dialer-start-btn" class="btn" style="width: 100%; margin-top: 6px; padding: 12px;">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 6px; display: inline-block; vertical-align: middle;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                    กดเพื่อจำลองโทรเข้า (Simulate Call)
-                                </button>
+                                <div style="display: flex; gap: 8px; margin-top: 6px;">
+                                    <button id="dialer-start-btn" class="btn" style="flex: 1; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                        จำลองโทรเข้า (Call)
+                                    </button>
+                                    <button id="dialer-toggle-phone-btn" class="btn btn-secondary" style="padding: 12px 14px; display: flex; align-items: center; justify-content: center; gap: 6px;" title="เปิดหรือปิดหน้าจอโทรศัพท์จำลอง">
+                                        📱 หน้าจอ
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -1609,6 +1619,10 @@
                 loadDashboardStats();
             } else if (tabId === 'tab-history') {
                 if (typeof loadCustomerHistory === 'function') loadCustomerHistory();
+            } else if (tabId === 'tab-sandbox') {
+                if (typeof resizeCanvas === 'function') {
+                    setTimeout(resizeCanvas, 60);
+                }
             }
         }
 
@@ -1619,29 +1633,43 @@
             });
         });
 
-        // CHARTS IMPLEMENTATION
+        // CHARTS & STATS IMPLEMENTATION
         let callAnalysisChart = null;
         let callBreakdownChart = null;
+        let currentHourlyLabels = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'];
+        let currentHourlyData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let currentWeeklyLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        let currentWeeklyData = [0, 0, 0, 0, 0, 0, 0];
+        let currentDonutData = [0, 0, 0, 0];
 
-        function initCharts(lineLabels, lineData, donutData) {
+        function updateLineChart(timeframe) {
             const ctx1 = document.getElementById('callAnalysisChart');
-            const ctx2 = document.getElementById('callBreakdownChart');
-
+            if (!ctx1) return;
+            
             if (callAnalysisChart) callAnalysisChart.destroy();
-            if (callBreakdownChart) callBreakdownChart.destroy();
-
-            // Gradient for line chart
+            
             const gradient = ctx1.getContext('2d').createLinearGradient(0, 0, 0, 240);
             gradient.addColorStop(0, 'rgba(139, 92, 246, 0.35)');
             gradient.addColorStop(1, 'rgba(139, 92, 246, 0.01)');
-
+            
+            let labels, data, datasetLabel;
+            if (timeframe === 'hourly') {
+                labels = currentHourlyLabels;
+                data = currentHourlyData;
+                datasetLabel = 'Calls per Hour (สาย)';
+            } else {
+                labels = currentWeeklyLabels;
+                data = currentWeeklyData;
+                datasetLabel = 'Calls per Day (สาย)';
+            }
+            
             callAnalysisChart = new Chart(ctx1, {
                 type: 'line',
                 data: {
-                    labels: lineLabels || ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'],
+                    labels: labels,
                     datasets: [{
-                        label: 'Total Calls Time (min)',
-                        data: lineData || [15, 25, 45, 30, 60, 40, 35, 55, 42, 20],
+                        label: datasetLabel,
+                        data: data,
                         borderColor: '#8b5cf6',
                         backgroundColor: gradient,
                         fill: true,
@@ -1663,7 +1691,11 @@
                         y: {
                             beginAtZero: true,
                             grid: { color: 'rgba(238, 234, 243, 0.8)' },
-                            ticks: { color: '#625f87', font: { family: 'Plus Jakarta Sans', size: 10 } }
+                            ticks: { 
+                                precision: 0,
+                                color: '#625f87', 
+                                font: { family: 'Plus Jakarta Sans', size: 10 } 
+                            }
                         },
                         x: {
                             grid: { display: false },
@@ -1672,14 +1704,20 @@
                     }
                 }
             });
+        }
 
+        function initDonutChart(donutData) {
+            const ctx2 = document.getElementById('callBreakdownChart');
+            if (!ctx2) return;
+            if (callBreakdownChart) callBreakdownChart.destroy();
+            
             callBreakdownChart = new Chart(ctx2, {
                 type: 'doughnut',
                 data: {
-                    labels: ['Completed', 'Missed', 'Busy'],
+                    labels: ['สอบถามข้อมูล', 'จองโต๊ะ/ห้อง', 'เช็กแต้มสะสม', 'โอนสายพนักงาน'],
                     datasets: [{
-                        data: donutData || [75, 15, 10],
-                        backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                        data: donutData || [0, 0, 0, 0],
+                        backgroundColor: ['#4f46e5', '#10b981', '#f59e0b', '#ef4444'],
                         borderWidth: 2,
                         borderColor: '#ffffff'
                     }]
@@ -1722,21 +1760,67 @@
                 const callsTbody = document.getElementById('dashboard-calls-tbody');
                 const resTbody = document.getElementById('dashboard-reservations-tbody');
 
+                // Reset dynamic charts arrays
+                currentHourlyData = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+                currentWeeklyData = [0, 0, 0, 0, 0, 0, 0];
+                let countBooking = 0;
+                let countPoints = 0;
+                let countTransfer = 0;
+                let countInquiry = 0;
+
                 // Process Call Logs
                 if (logsJson.status === 'success' && logsJson.data) {
                     const data = logsJson.data;
                     const phoneKeys = Object.keys(data);
-                    
-                    totalCalls = phoneKeys.length;
                     
                     if (callsTbody) {
                         callsTbody.innerHTML = '';
                     }
 
                     let callHistoryList = [];
+                    let totalDurationSec = 0;
                     phoneKeys.forEach(phone => {
                         const client = data[phone];
-                        totalDurationMin += (client.total_calls || 1) * 3.5; // Simulate average duration
+                        const history = client.history || [];
+                        totalCalls += history.length;
+                        
+                        history.forEach(call => {
+                            // Sum duration
+                            const dur = (call.duration_sec !== undefined) ? call.duration_sec : 210; // Fallback 3.5m
+                            totalDurationSec += dur;
+
+                            // Parse Hourly Line Chart
+                            if (call.timestamp) {
+                                const timePart = call.timestamp.split(' ')[1];
+                                if (timePart) {
+                                    const hour = parseInt(timePart.split(':')[0], 10);
+                                    if (hour >= 9 && hour <= 18) {
+                                        currentHourlyData[hour - 9] += 1;
+                                    }
+                                }
+
+                                // Parse Weekly Line Chart
+                                const isoStr = call.timestamp.replace(' ', 'T');
+                                const dateObj = new Date(isoStr);
+                                if (!isNaN(dateObj.getTime())) {
+                                    const day = dateObj.getDay(); // 0 Sunday, 1 Monday, ...
+                                    const idx = (day === 0) ? 6 : day - 1;
+                                    currentWeeklyData[idx] += 1;
+                                }
+                            }
+
+                            // Donut Breakdown by Tools
+                            const tools = call.tools_called || [];
+                            if (tools.includes("book_table")) {
+                                countBooking++;
+                            } else if (tools.includes("check_member_points")) {
+                                countPoints++;
+                            } else if (tools.includes("transfer_call")) {
+                                countTransfer++;
+                            } else {
+                                countInquiry++;
+                            }
+                        });
                         
                         callHistoryList.push({
                             name: client.caller_name || 'ลูกค้า',
@@ -1745,6 +1829,8 @@
                             summary: client.last_summary || '-'
                         });
                     });
+
+                    totalDurationMin = totalDurationSec / 60;
 
                     // Sort by last call time desc
                     callHistoryList.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
@@ -1771,7 +1857,7 @@
                 if (resJson.status === 'success' && resJson.data) {
                     const list = resJson.data || [];
                     activeReservations = list.length;
-                    totalActions = list.length; // E.g., Table booking action
+                    totalActions = list.length; // Table booking action
 
                     if (resTbody) {
                         resTbody.innerHTML = '';
@@ -1803,31 +1889,17 @@
                 document.getElementById('stat-total-actions').textContent = totalActions;
                 document.getElementById('stat-total-reservations').textContent = activeReservations;
 
-                // Load realistic-looking timeline labels/data based on dynamic stats
-                const lineLabels = ['9 AM', '10 AM', '11 AM', '12 PM', '1 PM', '2 PM', '3 PM', '4 PM', '5 PM', '6 PM'];
-                // Distribute calls dynamically for visual appeal
-                const activeCalls = activeReservations * 2 + totalCalls;
-                const lineData = [
-                    Math.ceil(activeCalls * 0.1 * 5),
-                    Math.ceil(activeCalls * 0.15 * 5),
-                    Math.ceil(activeCalls * 0.3 * 5),
-                    Math.ceil(activeCalls * 0.2 * 5),
-                    Math.ceil(activeCalls * 0.4 * 5),
-                    Math.ceil(activeCalls * 0.25 * 5),
-                    Math.ceil(activeCalls * 0.2 * 5),
-                    Math.ceil(activeCalls * 0.35 * 5),
-                    Math.ceil(activeCalls * 0.28 * 5),
-                    Math.ceil(activeCalls * 0.12 * 5)
-                ];
+                // Setup Donut Data
+                currentDonutData = [countInquiry, countBooking, countPoints, countTransfer];
+                if (countInquiry === 0 && countBooking === 0 && countPoints === 0 && countTransfer === 0) {
+                    currentDonutData = [12, 5, 3, 2]; // visual starter fallback
+                }
 
-                // Donut Breakdown
-                const donutData = [
-                    Math.ceil(totalCalls * 0.8) || 80,
-                    Math.ceil(totalCalls * 0.13) || 12,
-                    Math.ceil(totalCalls * 0.07) || 8
-                ];
-
-                initCharts(lineLabels, lineData, donutData);
+                // Setup Line Chart Timeframe
+                const select = document.getElementById('analysis-timeframe-select');
+                const selectedTimeframe = select ? select.value : 'weekly';
+                updateLineChart(selectedTimeframe);
+                initDonutChart(currentDonutData);
 
             } catch (err) {
                 console.error('Failed to load dashboard statistics:', err);
@@ -1839,50 +1911,181 @@
             loadDashboardStats();
         });
 
+        // ==========================================
         // PHONE CALL SIMULATOR VARIABLES & FUNCTIONS
+        // ==========================================
         let callTimerInterval = null;
         let callSeconds = 0;
         let isMuted = false;
+        let isSpeakerActive = false;
+        let dialpadNumber = "";
+        let phoneClockInterval = null;
+
+        function updatePhoneClock() {
+            const clockEl = document.getElementById('phone-clock-text');
+            if (clockEl) {
+                const now = new Date();
+                const h = String(now.getHours()).padStart(2, '0');
+                const m = String(now.getMinutes()).padStart(2, '0');
+                clockEl.textContent = `${h}:${m}`;
+            }
+        }
+        updatePhoneClock();
+        setInterval(updatePhoneClock, 10000);
 
         function startCallTimer() {
             callSeconds = 0;
             const timerEl = document.getElementById('phone-call-timer');
+            const dockTimerEl = document.getElementById('dock-call-timer');
             if (timerEl) timerEl.textContent = '00:00';
+            if (dockTimerEl) dockTimerEl.textContent = 'กำลังคุยอยู่: 00:00';
             clearInterval(callTimerInterval);
             callTimerInterval = setInterval(() => {
                 callSeconds++;
                 const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
                 const secs = String(callSeconds % 60).padStart(2, '0');
-                if (timerEl) timerEl.textContent = `${mins}:${secs}`;
+                const timeStr = `${mins}:${secs}`;
+                if (timerEl) timerEl.textContent = timeStr;
+                if (dockTimerEl) dockTimerEl.textContent = `กำลังคุยอยู่: ${timeStr}`;
             }, 1000);
         }
 
         function stopCallTimer() {
             clearInterval(callTimerInterval);
+            callTimerInterval = null;
+        }
+
+        function showPhoneToast(msg) {
+            const toast = document.getElementById('phone-toast');
+            if (!toast) return;
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2200);
+        }
+
+        function showPhoneView(viewId) {
+            const views = document.querySelectorAll('.phone-view');
+            views.forEach(v => v.classList.remove('active'));
+            const target = document.getElementById(viewId);
+            if (target) target.classList.add('active');
+        }
+
+        function playDTMF(digit) {
+            const dtmfFreqs = {
+                '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
+                '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
+                '7': [852, 1209], '8': [852, 1336], '9': [852, 1477],
+                '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
+            };
+            const freqs = dtmfFreqs[digit];
+            if (!freqs) return;
+            try {
+                const ctx = (player && player.audioCtx) ? player.audioCtx : (audioContext || new (window.AudioContext || window.webkitAudioContext)());
+                if (ctx.state === 'suspended') ctx.resume();
+                const osc1 = ctx.createOscillator();
+                const osc2 = ctx.createOscillator();
+                const gain = ctx.createGain();
+                gain.gain.setValueAtTime(0.12, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+                osc1.frequency.value = freqs[0];
+                osc2.frequency.value = freqs[1];
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(ctx.destination);
+                osc1.start();
+                osc2.start();
+                osc1.stop(ctx.currentTime + 0.18);
+                osc2.stop(ctx.currentTime + 0.18);
+            } catch (e) {
+                console.warn('DTMF sound error:', e);
+            }
         }
 
         function openPhoneModal(name) {
+            const callerName = name || document.getElementById('dialer-name')?.value.trim() || 'Vera Sun';
             const callerNameEl = document.getElementById('phone-caller-name');
-            if (callerNameEl) callerNameEl.textContent = name || 'Vera Sun';
+            const dockCallerName = document.getElementById('dock-caller-name');
+            if (callerNameEl) callerNameEl.textContent = callerName;
+            if (dockCallerName) dockCallerName.textContent = `สายสนทนาสด: ${callerName}`;
+            
             const modal = document.getElementById('phone-modal-overlay');
             if (modal) modal.classList.add('active');
-            if (!callTimerInterval) startCallTimer();
+            
+            // Hide floating dock while phone is open
+            const dock = document.getElementById('floating-call-dock');
+            if (dock) dock.classList.remove('active');
+
+            showPhoneView('view-phone-main');
+            if (isConnected && !callTimerInterval) {
+                startCallTimer();
+            }
         }
 
         function closePhoneModal() {
             const modal = document.getElementById('phone-modal-overlay');
             if (modal) modal.classList.remove('active');
+            
+            // Show floating dock if call is currently active
+            const dock = document.getElementById('floating-call-dock');
+            if (dock && isConnected) {
+                dock.classList.add('active');
+            }
+        }
+
+        function togglePhoneModal() {
+            const modal = document.getElementById('phone-modal-overlay');
+            if (modal && modal.classList.contains('active')) {
+                closePhoneModal();
+            } else {
+                openPhoneModal();
+            }
+        }
+
+        function endPhoneCall() {
+            closePhoneModal();
+            stopCallTimer();
+            const dock = document.getElementById('floating-call-dock');
+            if (dock) dock.classList.remove('active');
+            
+            const avatarCircle = document.getElementById('caller-avatar-circle');
+            if (avatarCircle) avatarCircle.classList.remove('speaking');
+
+            if (isConnected) {
+                disconnect();
+            }
+            log('📞 วางสายโทรศัพท์เรียบร้อยแล้ว', 'system');
         }
 
         // Phone Simulator Event Listeners
-        document.addEventListener('DOMContentLoaded', () => {
-            const phoneMinimizeBtn = document.getElementById('phone-minimize-btn');
-            if (phoneMinimizeBtn) {
-                phoneMinimizeBtn.addEventListener('click', () => {
-                    closePhoneModal();
+        function initPhoneSimulator() {
+            const selectTimeframe = document.getElementById('analysis-timeframe-select');
+            if (selectTimeframe) {
+                selectTimeframe.addEventListener('change', (e) => {
+                    updateLineChart(e.target.value);
                 });
             }
 
+            // Topbar Phone Launcher Button
+            const topbarPhoneBtn = document.getElementById('topbar-phone-btn');
+            if (topbarPhoneBtn) {
+                topbarPhoneBtn.addEventListener('click', togglePhoneModal);
+            }
+
+            // Dialer Sandbox Preview / Toggle Button
+            const dialerToggleBtn = document.getElementById('dialer-toggle-phone-btn');
+            if (dialerToggleBtn) {
+                dialerToggleBtn.addEventListener('click', togglePhoneModal);
+            }
+
+            // Phone Minimize / Close Button
+            const phoneMinimizeBtn = document.getElementById('phone-minimize-btn');
+            if (phoneMinimizeBtn) {
+                phoneMinimizeBtn.addEventListener('click', closePhoneModal);
+            }
+
+            // Backdrop click closes phone
             const phoneOverlay = document.getElementById('phone-modal-overlay');
             if (phoneOverlay) {
                 phoneOverlay.addEventListener('click', (e) => {
@@ -1892,37 +2095,214 @@
                 });
             }
 
-            const phoneHangupBtn = document.getElementById('phone-hangup-btn');
-            if (phoneHangupBtn) {
-                phoneHangupBtn.addEventListener('click', () => {
+            // Escape key minimizes phone
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
                     closePhoneModal();
-                    stopCallTimer();
-                    callTimerInterval = null;
-                    if (isConnected) {
-                        disconnect();
+                }
+            });
+
+            // Home bar indicator returns to main view
+            const homeIndicator = document.getElementById('phone-home-indicator');
+            if (homeIndicator) {
+                homeIndicator.addEventListener('click', () => {
+                    showPhoneView('view-phone-main');
+                });
+            }
+
+            // Hangup buttons on all subviews
+            ['phone-hangup-btn', 'phone-hangup-btn-keypad', 'phone-hangup-btn-facetime', 'dock-hangup-btn'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        endPhoneCall();
+                    });
+                }
+            });
+
+            // Floating Mini-Dock expand button & dock click
+            const floatingDock = document.getElementById('floating-call-dock');
+            const dockExpandBtn = document.getElementById('dock-expand-btn');
+            if (floatingDock) {
+                floatingDock.addEventListener('click', () => openPhoneModal());
+            }
+            if (dockExpandBtn) {
+                dockExpandBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openPhoneModal();
+                });
+            }
+
+            // 1. MUTE BUTTON
+            const btnPhoneMute = document.getElementById('btn-phone-mute');
+            const labelPhoneMute = document.getElementById('label-phone-mute');
+            const iconPhoneMute = document.getElementById('icon-phone-mute');
+            if (btnPhoneMute) {
+                btnPhoneMute.addEventListener('click', () => {
+                    isMuted = !isMuted;
+                    if (isMuted) {
+                        btnPhoneMute.classList.add('active-red');
+                        if (labelPhoneMute) labelPhoneMute.textContent = 'เปิดเสียง';
+                        showPhoneToast('🔇 ปิดไมโครโฟนแล้ว (Muted)');
+                        log('Microphone muted in phone simulator.', 'system');
+                    } else {
+                        btnPhoneMute.classList.remove('active-red');
+                        if (labelPhoneMute) labelPhoneMute.textContent = 'ปิดเสียง';
+                        showPhoneToast('🎙️ เปิดไมโครโฟนแล้ว (Active)');
+                        log('Microphone unmuted in phone simulator.', 'system');
                     }
                 });
             }
 
-            const btnPhoneMute = document.getElementById('btn-phone-mute');
-            if (btnPhoneMute) {
-                btnPhoneMute.addEventListener('click', () => {
-                    isMuted = !isMuted;
-                    const labelMute = document.getElementById('label-phone-mute');
-                    if (isMuted) {
-                        btnPhoneMute.classList.add('active');
-                        btnPhoneMute.textContent = '🔇';
-                        if (labelMute) labelMute.textContent = 'เปิดเสียง';
-                        log('Microphone muted.', 'system');
+            // 2. KEYPAD (DIALPAD)
+            const btnPhoneKeypad = document.getElementById('btn-phone-keypad');
+            const keypadDisplay = document.getElementById('keypad-display-number');
+            const btnKeypadBack = document.getElementById('btn-keypad-back');
+            const btnKeypadClear = document.getElementById('btn-keypad-clear');
+            const btnKeypadSend = document.getElementById('btn-keypad-send');
+
+            if (btnPhoneKeypad) {
+                btnPhoneKeypad.addEventListener('click', () => {
+                    dialpadNumber = "";
+                    if (keypadDisplay) keypadDisplay.textContent = "";
+                    showPhoneView('view-phone-keypad');
+                });
+            }
+            if (btnKeypadBack) {
+                btnKeypadBack.addEventListener('click', () => {
+                    showPhoneView('view-phone-main');
+                });
+            }
+            if (btnKeypadClear) {
+                btnKeypadClear.addEventListener('click', () => {
+                    dialpadNumber = dialpadNumber.slice(0, -1);
+                    if (keypadDisplay) keypadDisplay.textContent = dialpadNumber;
+                });
+            }
+            if (btnKeypadSend) {
+                btnKeypadSend.addEventListener('click', () => {
+                    if (!dialpadNumber) {
+                        showPhoneToast('กรุณากดตัวเลขก่อนส่ง');
+                        return;
+                    }
+                    if (isConnected && ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ event: 'text', text: `[DTMF Keypad Pressed: ${dialpadNumber}]` }));
+                        showPhoneToast(`ส่งรหัส ${dialpadNumber} ไปยัง AI แล้ว`);
+                        log(`[DTMF] Sent key sequence: ${dialpadNumber}`, 'user');
+                        dialpadNumber = "";
+                        if (keypadDisplay) keypadDisplay.textContent = "";
+                        showPhoneView('view-phone-main');
                     } else {
-                        btnPhoneMute.classList.remove('active');
-                        btnPhoneMute.textContent = '🎙️';
-                        if (labelMute) labelMute.textContent = 'ปิดเสียง';
-                        log('Microphone unmuted.', 'system');
+                        showPhoneToast(`รหัส: ${dialpadNumber} (ยังไม่ได้เชื่อมต่อสาย)`);
                     }
                 });
             }
-        });
+
+            // Keypad digit keys
+            document.querySelectorAll('.keypad-key').forEach(key => {
+                key.addEventListener('click', () => {
+                    const digit = key.getAttribute('data-digit');
+                    if (digit) {
+                        playDTMF(digit);
+                        dialpadNumber += digit;
+                        if (keypadDisplay) keypadDisplay.textContent = dialpadNumber;
+                    }
+                });
+            });
+
+            // 3. SPEAKER BUTTON (BOOST AUDIO)
+            const btnPhoneSpeaker = document.getElementById('btn-phone-speaker');
+            const labelPhoneSpeaker = document.getElementById('label-phone-speaker');
+            if (btnPhoneSpeaker) {
+                btnPhoneSpeaker.addEventListener('click', () => {
+                    isSpeakerActive = !isSpeakerActive;
+                    if (isSpeakerActive) {
+                        btnPhoneSpeaker.classList.add('active');
+                        if (player && typeof player.setGain === 'function') player.setGain(2.2);
+                        if (labelPhoneSpeaker) labelPhoneSpeaker.textContent = 'ลำโพง (เปิด)';
+                        showPhoneToast('🔊 เปิดโหมดลำโพงเสียงดัง 200%');
+                    } else {
+                        btnPhoneSpeaker.classList.remove('active');
+                        if (player && typeof player.setGain === 'function') player.setGain(1.0);
+                        if (labelPhoneSpeaker) labelPhoneSpeaker.textContent = 'เสียง';
+                        showPhoneToast('🔉 ระดับเสียงลำโพงปกติ (100%)');
+                    }
+                });
+            }
+
+            // 4. ADD CALL / TRANSFER
+            const btnPhoneAddcall = document.getElementById('btn-phone-addcall');
+            if (btnPhoneAddcall) {
+                btnPhoneAddcall.addEventListener('click', () => {
+                    showPhoneView('view-phone-contacts');
+                    showPhoneToast('เลือกเบอร์หรือแผนกที่ต้องการโอนสาย');
+                });
+            }
+
+            // 5. FACETIME / AI HOLOGRAM
+            const btnPhoneFacetime = document.getElementById('btn-phone-facetime');
+            const btnFacetimeBack = document.getElementById('btn-facetime-back');
+            if (btnPhoneFacetime) {
+                btnPhoneFacetime.addEventListener('click', () => {
+                    showPhoneView('view-phone-facetime');
+                    showPhoneToast('เข้าสู่โหมด FaceTime AI Multimodal');
+                });
+            }
+            if (btnFacetimeBack) {
+                btnFacetimeBack.addEventListener('click', () => {
+                    showPhoneView('view-phone-main');
+                });
+            }
+
+            // 6. CONTACTS VIEW
+            const btnPhoneContacts = document.getElementById('btn-phone-contacts');
+            const btnContactsBack = document.getElementById('btn-contacts-back');
+            if (btnPhoneContacts) {
+                btnPhoneContacts.addEventListener('click', () => {
+                    showPhoneView('view-phone-contacts');
+                });
+            }
+            if (btnContactsBack) {
+                btnContactsBack.addEventListener('click', () => {
+                    showPhoneView('view-phone-main');
+                });
+            }
+
+            // Contact items click
+            document.querySelectorAll('.contact-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const cName = item.getAttribute('data-name');
+                    const cPhone = item.getAttribute('data-phone');
+                    const cRole = item.getAttribute('data-role');
+                    
+                    if (cRole && cRole.includes('โอนสาย')) {
+                        showPhoneToast(`กำลังโอนสายไปยัง ${cName}...`);
+                        showTransferModal();
+                        showPhoneView('view-phone-main');
+                        log(`[CALL TRANSFER] Transferred to ${cName} (${cPhone})`, 'tool');
+                    } else {
+                        // Switch caller identity
+                        const nameInput = document.getElementById('dialer-name');
+                        const phoneInput = document.getElementById('dialer-phone');
+                        if (nameInput) nameInput.value = cName;
+                        if (phoneInput) phoneInput.value = cPhone;
+                        
+                        const callerNameEl = document.getElementById('phone-caller-name');
+                        if (callerNameEl) callerNameEl.textContent = cName;
+                        
+                        showPhoneToast(`สลับโปรไฟล์ผู้โทร: ${cName}`);
+                        showPhoneView('view-phone-main');
+                    }
+                });
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initPhoneSimulator);
+        } else {
+            initPhoneSimulator();
+        }
 
         // PORTED CHAT / AUDIO / WEBSOCKET LOGIC FROM ORIGINAL WEB UI
         const consoleEl = document.getElementById('console');
@@ -2086,14 +2466,16 @@
             }
         }
 
-        // Web Audio Player class
+        // Web Audio Player class with Volume Booster GainNode
         class AudioPlayer {
             constructor(sampleRate = 24000) {
                 this.sampleRate = sampleRate;
                 this.audioCtx = null;
+                this.gainNode = null;
                 this.nextStartTime = 0;
                 this.activeSources = [];
                 this.onPlaybackStateChange = null;
+                this.currentGain = 1.0;
             }
 
             init(ctx = null) {
@@ -2102,8 +2484,19 @@
                 } else if (!this.audioCtx) {
                     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
                 }
+                if (!this.gainNode && this.audioCtx) {
+                    this.gainNode = this.audioCtx.createGain();
+                    this.gainNode.gain.value = this.currentGain;
+                }
                 if (this.nextStartTime < this.audioCtx.currentTime) {
                     this.nextStartTime = this.audioCtx.currentTime;
+                }
+            }
+
+            setGain(multiplier) {
+                this.currentGain = multiplier;
+                if (this.gainNode && this.audioCtx) {
+                    this.gainNode.gain.setValueAtTime(multiplier, this.audioCtx.currentTime);
                 }
             }
 
@@ -2132,11 +2525,14 @@
                 const source = this.audioCtx.createBufferSource();
                 source.buffer = audioBuffer;
                 
-                // Route through output analyst if available
+                // Route: source -> gainNode -> (outputAnalyst) -> destination
+                source.connect(this.gainNode);
                 if (outputAnalyst) {
-                    source.connect(outputAnalyst);
+                    try { this.gainNode.disconnect(); } catch(e){}
+                    this.gainNode.connect(outputAnalyst);
                 } else {
-                    source.connect(this.audioCtx.destination);
+                    try { this.gainNode.disconnect(); } catch(e){}
+                    this.gainNode.connect(this.audioCtx.destination);
                 }
 
                 const currentTime = this.audioCtx.currentTime;
@@ -2179,83 +2575,228 @@
 
         const player = new AudioPlayer(24000);
         
-        // Canvas waveform variables
+        // Canvas waveform variables & high-polish visualizer
         const canvas = document.getElementById('waveform');
-        const canvasCtx = canvas.getContext('2d');
+        const canvasCtx = canvas ? canvas.getContext('2d') : null;
         let animationId;
         let inputAnalyst = null;
         let outputAnalyst = null;
+        let wavePhase = 0;
 
         function resizeCanvas() {
-            if (!canvas) return;
-            canvas.width = canvas.parentElement.clientWidth;
-            canvas.height = canvas.parentElement.clientHeight;
+            if (!canvas || !canvas.parentElement) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const w = rect.width || 340;
+            const h = rect.height || 180;
+            
+            if (canvas.width !== Math.floor(w * dpr) || canvas.height !== Math.floor(h * dpr)) {
+                canvas.width = Math.floor(w * dpr);
+                canvas.height = Math.floor(h * dpr);
+            }
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
         function drawWave() {
-            if (!canvas) return;
+            if (!canvas || !canvasCtx) return;
             animationId = requestAnimationFrame(drawWave);
             
-            const width = canvas.width;
-            const height = canvas.height;
+            resizeCanvas();
             
-            canvasCtx.fillStyle = '#0b071e';
+            const dpr = window.devicePixelRatio || 1;
+            const width = canvas.width / dpr;
+            const height = canvas.height / dpr;
+            
+            canvasCtx.save();
+            canvasCtx.scale(dpr, dpr);
+            
+            // Dark Velvet Background
+            const bgGrad = canvasCtx.createRadialGradient(width/2, height/2, 10, width/2, height/2, width*0.7);
+            bgGrad.addColorStop(0, '#111328');
+            bgGrad.addColorStop(0.7, '#080a18');
+            bgGrad.addColorStop(1, '#04050d');
+            canvasCtx.fillStyle = bgGrad;
             canvasCtx.fillRect(0, 0, width, height);
-            
-            let dataArray = new Uint8Array(128);
-            let activeAnalyst = null;
-            
-            // If Gemini is playing audio back, visualize that. Otherwise, visualize user mic input.
-            if (isReceivingAudio && outputAnalyst) {
-                activeAnalyst = outputAnalyst;
-            } else if (inputAnalyst) {
-                activeAnalyst = inputAnalyst;
-            }
-            
-            if (activeAnalyst) {
-                activeAnalyst.getByteTimeDomainData(dataArray);
-            } else {
-                // Return flatline centered at 128
-                dataArray.fill(128);
-            }
-            
-            canvasCtx.lineWidth = 3;
-            // Linear gradient color path
-            const grad = canvasCtx.createLinearGradient(0, 0, width, 0);
-            grad.addColorStop(0, '#8b5cf6');
-            grad.addColorStop(0.5, '#ec4899');
-            grad.addColorStop(1, '#a78bfa');
-            canvasCtx.strokeStyle = grad;
+
+            // Subtle center grid/line
+            canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+            canvasCtx.lineWidth = 1;
             canvasCtx.beginPath();
-            
-            const sliceWidth = width / dataArray.length;
-            let x = 0;
-            
-            for (let i = 0; i < dataArray.length; i++) {
-                const v = dataArray[i] / 128.0;
-                let y = v * (height / 2);
-                
-                // Add minor noise if talking to look lively
-                if (activeAnalyst && isConnected) {
-                    // noise effect
-                } else {
-                    y = (height / 2) + (Math.sin(i * 0.15 + Date.now() * 0.005) * 2.0);
-                }
-                
-                if (i === 0) {
-                    canvasCtx.moveTo(x, y);
-                } else {
-                    canvasCtx.lineTo(x, y);
-                }
-                x += sliceWidth;
-            }
-            
+            canvasCtx.moveTo(0, height / 2);
             canvasCtx.lineTo(width, height / 2);
             canvasCtx.stroke();
+            
+            wavePhase += 0.04;
+
+            let dataArray = new Uint8Array(128);
+            let activeAnalyst = null;
+            let visualMode = 'idle'; // 'idle' | 'user' | 'ai'
+
+            if (isReceivingAudio && outputAnalyst) {
+                activeAnalyst = outputAnalyst;
+                visualMode = 'ai';
+            } else if (isConnected && inputAnalyst && !isMuted) {
+                activeAnalyst = inputAnalyst;
+                visualMode = 'user';
+            }
+
+            if (activeAnalyst) {
+                activeAnalyst.getByteTimeDomainData(dataArray);
+            }
+
+            if (visualMode === 'ai') {
+                // ==========================================
+                // 1. AI PLAYBACK WAVE (Glowing Magenta/Purple/Amber)
+                // ==========================================
+                const grad = canvasCtx.createLinearGradient(0, 0, width, 0);
+                grad.addColorStop(0, '#818cf8');
+                grad.addColorStop(0.3, '#c084fc');
+                grad.addColorStop(0.7, '#f472b6');
+                grad.addColorStop(1, '#fb923c');
+
+                canvasCtx.shadowBlur = 18;
+                canvasCtx.shadowColor = 'rgba(244, 114, 182, 0.8)';
+                canvasCtx.lineWidth = 3.5;
+                canvasCtx.strokeStyle = grad;
+                canvasCtx.beginPath();
+
+                const sliceWidth = width / dataArray.length;
+                let x = 0;
+
+                for (let i = 0; i < dataArray.length; i++) {
+                    const norm = (dataArray[i] - 128) / 128.0;
+                    const amp = Math.max(0.15, Math.abs(norm) * 1.8);
+                    const sinHarmonic = Math.sin(i * 0.2 + wavePhase * 1.5) * 14 * amp;
+                    const y = (height / 2) + (norm * (height * 0.42)) + sinHarmonic;
+
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+                canvasCtx.stroke();
+
+                // Secondary harmonic glow line
+                canvasCtx.shadowBlur = 8;
+                canvasCtx.lineWidth = 1.5;
+                canvasCtx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+                canvasCtx.beginPath();
+                x = 0;
+                for (let i = 0; i < dataArray.length; i++) {
+                    const norm = (dataArray[i] - 128) / 128.0;
+                    const y = (height / 2) + (norm * (height * 0.25)) + Math.sin(i * 0.25 - wavePhase * 2) * 6;
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+                canvasCtx.stroke();
+
+                // State Badge
+                drawVisualizerBadge(canvasCtx, '🤖 AI กำลังตอบกลับด้วยเสียง (Gemini Live)', '#ec4899', width, height);
+
+            } else if (visualMode === 'user') {
+                // ==========================================
+                // 2. USER SPEAKING WAVE (Neon Cyan/Emerald)
+                // ==========================================
+                const grad = canvasCtx.createLinearGradient(0, 0, width, 0);
+                grad.addColorStop(0, '#06b6d4');
+                grad.addColorStop(0.5, '#38bdf8');
+                grad.addColorStop(1, '#34d399');
+
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = 'rgba(56, 189, 248, 0.7)';
+                canvasCtx.lineWidth = 3;
+                canvasCtx.strokeStyle = grad;
+                canvasCtx.beginPath();
+
+                const sliceWidth = width / dataArray.length;
+                let x = 0;
+                let totalEnergy = 0;
+
+                for (let i = 0; i < dataArray.length; i++) {
+                    const norm = (dataArray[i] - 128) / 128.0;
+                    totalEnergy += Math.abs(norm);
+                    const y = (height / 2) + (norm * (height * 0.45));
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                    x += sliceWidth;
+                }
+                canvasCtx.stroke();
+
+                // Live mic active ripple
+                const avgEnergy = totalEnergy / dataArray.length;
+                drawVisualizerBadge(canvasCtx, avgEnergy > 0.03 ? '🎙️ กำลังรับเสียงพูดของคุณ (Live Speech)' : '🎙️ รอรับเสียงพูด (ไมค์เปิดอยู่)', '#38bdf8', width, height);
+
+            } else {
+                // ==========================================
+                // 3. IDLE / READY MODE (Fluid Breathing Waves)
+                // ==========================================
+                const grad = canvasCtx.createLinearGradient(0, 0, width, 0);
+                grad.addColorStop(0, '#6366f1');
+                grad.addColorStop(0.5, '#a855f7');
+                grad.addColorStop(1, '#6366f1');
+
+                canvasCtx.shadowBlur = 10;
+                canvasCtx.shadowColor = 'rgba(99, 102, 241, 0.5)';
+                canvasCtx.lineWidth = 2.2;
+                canvasCtx.strokeStyle = grad;
+                canvasCtx.beginPath();
+
+                const points = 60;
+                const sliceWidth = width / points;
+                for (let i = 0; i <= points; i++) {
+                    const x = i * sliceWidth;
+                    const sin1 = Math.sin(i * 0.12 + wavePhase) * 9;
+                    const sin2 = Math.cos(i * 0.08 - wavePhase * 0.7) * 5;
+                    const y = (height / 2) + sin1 + sin2;
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                }
+                canvasCtx.stroke();
+
+                // Translucent subtle secondary sine wave
+                canvasCtx.shadowBlur = 0;
+                canvasCtx.lineWidth = 1.2;
+                canvasCtx.strokeStyle = 'rgba(168, 85, 247, 0.3)';
+                canvasCtx.beginPath();
+                for (let i = 0; i <= points; i++) {
+                    const x = i * sliceWidth;
+                    const y = (height / 2) + Math.sin(i * 0.15 - wavePhase * 0.8) * 12;
+                    if (i === 0) canvasCtx.moveTo(x, y);
+                    else canvasCtx.lineTo(x, y);
+                }
+                canvasCtx.stroke();
+
+                drawVisualizerBadge(canvasCtx, isConnected ? '● สายพร้อมใช้งาน • สามารถพูดได้ทันที' : '● ระบบพร้อมทำงาน • แตะไมค์หรือโทรเพื่อเริ่ม', '#818cf8', width, height);
+            }
+
+            canvasCtx.restore();
         }
-        drawWave();
+
+        function drawVisualizerBadge(ctx, text, color, width, height) {
+            ctx.shadowBlur = 0;
+            ctx.font = '600 11px system-ui, -apple-system, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            const textWidth = ctx.measureText(text).width;
+            const badgeW = textWidth + 24;
+            const badgeH = 22;
+            const badgeX = (width - badgeW) / 2;
+            const badgeY = height - 20;
+            
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+            ctx.beginPath();
+            ctx.roundRect(badgeX, badgeY - badgeH/2, badgeW, badgeH, 11);
+            ctx.fill();
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillText(text, width / 2, badgeY);
+        }
 
         // WebSocket Connection
         let ws = null;
@@ -2268,33 +2809,57 @@
         let activeBotConsoleLine = null;
         let activeBotTranscript = "";
 
+        drawWave();
+
         const mainAvatarBtn = document.getElementById('avatar-mic-btn-main');
         const sidebarAvatarBtn = document.getElementById('avatar-btn');
         const sidebarAvatarIcon = document.getElementById('avatar-icon');
         const statusText = document.getElementById('status-text');
         const statusSubtitle = document.getElementById('status-subtitle');
 
-        // Link the player playback states to the avatar layouts
+        // Link the player playback states to the avatar layouts & phone caller pulsing
         player.onPlaybackStateChange = (isPlaying) => {
+            const callerAvatar = document.getElementById('caller-avatar-circle');
+            const facetimeStatus = document.getElementById('facetime-status-text');
+            const holoOrb = document.getElementById('ai-holo-orb');
+
             if (isConnected) {
                 if (isPlaying) {
                     // Update main avatar button in sandbox tab
-                    mainAvatarBtn.className = 'avatar-mic-btn active';
-                    mainAvatarBtn.textContent = '🔊';
+                    if (mainAvatarBtn) {
+                        mainAvatarBtn.className = 'avatar-mic-btn active';
+                        mainAvatarBtn.textContent = '🔊';
+                    }
                     
                     // Update sidebar assistant button
-                    sidebarAvatarBtn.className = 'avatar-button connected speaking';
-                    sidebarAvatarIcon.textContent = '🔊';
+                    if (sidebarAvatarBtn) {
+                        sidebarAvatarBtn.className = 'avatar-button connected speaking';
+                        if (sidebarAvatarIcon) sidebarAvatarIcon.textContent = '🔊';
+                    }
                     
-                    statusText.textContent = 'AI กำลังสนทนาอธิบาย...';
+                    if (statusText) statusText.textContent = 'AI กำลังสนทนาอธิบาย...';
+                    
+                    // Phone Simulator speaking effects
+                    if (callerAvatar) callerAvatar.classList.add('speaking');
+                    if (facetimeStatus) facetimeStatus.textContent = '🤖 Gemini กำลังอธิบายด้วยเสียง...';
+                    if (holoOrb) holoOrb.style.filter = 'drop-shadow(0 0 20px #ec4899)';
                 } else {
-                    mainAvatarBtn.className = 'avatar-mic-btn active';
-                    mainAvatarBtn.textContent = '🎤';
+                    if (mainAvatarBtn) {
+                        mainAvatarBtn.className = 'avatar-mic-btn active';
+                        mainAvatarBtn.textContent = '🎤';
+                    }
                     
-                    sidebarAvatarBtn.className = 'avatar-button connected';
-                    sidebarAvatarIcon.textContent = '🎤';
+                    if (sidebarAvatarBtn) {
+                        sidebarAvatarBtn.className = 'avatar-button connected';
+                        if (sidebarAvatarIcon) sidebarAvatarIcon.textContent = '🎤';
+                    }
                     
-                    statusText.textContent = 'ระบบสายสนทนาพร้อมใช้งาน';
+                    if (statusText) statusText.textContent = 'ระบบสายสนทนาพร้อมใช้งาน';
+                    
+                    // Phone Simulator idle effects
+                    if (callerAvatar) callerAvatar.classList.remove('speaking');
+                    if (facetimeStatus) facetimeStatus.textContent = 'กำลังรับฟังเสียงพูดของคุณ...';
+                    if (holoOrb) holoOrb.style.filter = 'none';
                 }
             }
         };
@@ -2314,13 +2879,17 @@
         if (mainAvatarBtn) mainAvatarBtn.addEventListener('click', toggleConnection);
 
         function connect() {
-            mainAvatarBtn.className = 'avatar-mic-btn active';
-            mainAvatarBtn.textContent = '⏳';
+            if (mainAvatarBtn) {
+                mainAvatarBtn.className = 'avatar-mic-btn active';
+                mainAvatarBtn.textContent = '⏳';
+            }
             
-            sidebarAvatarBtn.className = 'avatar-button connecting';
-            sidebarAvatarIcon.textContent = '⏳';
+            if (sidebarAvatarBtn) {
+                sidebarAvatarBtn.className = 'avatar-button connecting';
+                if (sidebarAvatarIcon) sidebarAvatarIcon.textContent = '⏳';
+            }
             
-            statusText.textContent = 'กำลังเริ่มต้นเชื่อมต่อ WebSocket...';
+            if (statusText) statusText.textContent = 'กำลังเริ่มต้นเชื่อมต่อ WebSocket...';
             log('Connecting to WebSocket server...', 'system');
 
             // Request microphone access
@@ -2340,17 +2909,21 @@
                 
                 ws.onopen = () => {
                     isConnected = true;
-                    mainAvatarBtn.className = 'avatar-mic-btn active';
-                    mainAvatarBtn.textContent = '🎤';
+                    if (mainAvatarBtn) {
+                        mainAvatarBtn.className = 'avatar-mic-btn active';
+                        mainAvatarBtn.textContent = '🎤';
+                    }
                     
-                    sidebarAvatarBtn.className = 'avatar-button connected';
-                    sidebarAvatarIcon.textContent = '🎤';
+                    if (sidebarAvatarBtn) {
+                        sidebarAvatarBtn.className = 'avatar-button connected';
+                        if (sidebarAvatarIcon) sidebarAvatarIcon.textContent = '🎤';
+                    }
                     
-                    statusText.textContent = 'กำลังดึงคำสั่งความรู้บอท...';
+                    if (statusText) statusText.textContent = 'กำลังดึงคำสั่งความรู้บอท...';
                     log('Connected to server. Initializing audio context stream...', 'system');
                     
-                    const cName = document.getElementById('dialer-name').value.trim() || 'Vera Sun';
-                    const cPhone = document.getElementById('dialer-phone').value.trim() || '081-234-5678';
+                    const cName = document.getElementById('dialer-name')?.value.trim() || 'Vera Sun';
+                    const cPhone = document.getElementById('dialer-phone')?.value.trim() || '081-234-5678';
                     ws.send(JSON.stringify({ event: 'setup', name: cName, phone: cPhone }));
 
                     audioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
@@ -2365,8 +2938,11 @@
                     outputAnalyst.fftSize = 256;
                     outputAnalyst.connect(audioContext.destination);
 
-                    // Initialize Player with the shared audioContext to avoid different audio context mismatch
+                    // Initialize Player with the shared audioContext
                     player.init(audioContext);
+
+                    // Start Call Timer
+                    startCallTimer();
 
                     // Setup Recording script processing node (512 buffer size)
                     scriptNode = audioContext.createScriptProcessor(512, 1, 1);
@@ -2580,7 +3156,14 @@
 
         function disconnect() {
             isConnected = false;
+            stopCallTimer();
             
+            const dock = document.getElementById('floating-call-dock');
+            if (dock) dock.classList.remove('active');
+            
+            const callerAvatar = document.getElementById('caller-avatar-circle');
+            if (callerAvatar) callerAvatar.classList.remove('speaking');
+
             if (ws) {
                 ws.close();
                 ws = null;
@@ -2606,16 +3189,20 @@
             player.clear();
             player.audioCtx = null;
 
-            mainAvatarBtn.className = 'avatar-mic-btn';
-            mainAvatarBtn.textContent = '📞';
+            if (mainAvatarBtn) {
+                mainAvatarBtn.className = 'avatar-mic-btn';
+                mainAvatarBtn.textContent = '📞';
+            }
             
-            sidebarAvatarBtn.className = 'avatar-button';
-            sidebarAvatarIcon.textContent = '📞';
+            if (sidebarAvatarBtn) {
+                sidebarAvatarBtn.className = 'avatar-button';
+                if (sidebarAvatarIcon) sidebarAvatarIcon.textContent = '📞';
+            }
             
-            statusText.textContent = 'พร้อมเริ่มต้นสนทนาทดสอบเสียง';
-            statusSubtitle.textContent = 'คลิกไอคอนหูโทรศัพท์ด้านบนเพื่อเริ่มเชื่อมต่อไมโครโฟน';
-            chatInput.disabled = true;
-            sendBtn.disabled = true;
+            if (statusText) statusText.textContent = 'พร้อมเริ่มต้นสนทนาทดสอบเสียง';
+            if (statusSubtitle) statusSubtitle.textContent = 'คลิกไอคอนหูโทรศัพท์ด้านบนเพื่อเริ่มเชื่อมต่อไมโครโฟน';
+            if (chatInput) chatInput.disabled = true;
+            if (sendBtn) sendBtn.disabled = true;
             if (speakingBadge) speakingBadge.style.display = 'none';
 
             // Refresh recent lists on dashboard
@@ -2902,29 +3489,77 @@
                     if (keys.length === 0) {
                         logsContainer.innerHTML = '<p style="font-size:12px; color:var(--text-muted); text-align:center;">ไม่มีประวัติการโทรสนทนาย้อนหลัง</p>';
                     } else {
+                        let allCalls = [];
                         keys.forEach(phone => {
-                            const item = data[phone];
+                            const client = data[phone];
+                            const history = client.history || [];
+                            history.forEach(call => {
+                                allCalls.push({
+                                    phone: phone,
+                                    caller_name: client.caller_name || 'ลูกค้า',
+                                    timestamp: call.timestamp,
+                                    recording_file: call.recording_file,
+                                    duration_sec: call.duration_sec,
+                                    summary: call.summary || client.last_summary || 'สนทนากับผู้ช่วยเสียง',
+                                    transcript: call.transcript || []
+                                });
+                            });
+                        });
+                        
+                        // Sort newest first
+                        allCalls.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                        
+                        allCalls.forEach((call, index) => {
                             const card = document.createElement('div');
-                            card.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:14px; padding:16px; font-size:13px; box-shadow: var(--shadow-soft);';
+                            card.className = 'history-call-card';
+                            card.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:14px; padding:16px; font-size:13px; box-shadow: var(--shadow-soft); display:flex; flex-direction:column; gap:10px; margin-bottom: 12px;';
                             
-                            const audioPlayerHtml = item.recording_file ? `
-                                <div class="audio-recording-box">
-                                    <div class="audio-title">
-                                        <span>🎧</span>
-                                        <span>ฟังเสียงบันทึกสายสนทนาย้อนหลัง:</span>
-                                    </div>
-                                    <audio controls style="width:100%; height:36px; border-radius: 6px;" src="/api/recordings/${escapeHtml(item.recording_file)}"></audio>
+                            const durText = call.duration_sec ? `${Math.ceil(call.duration_sec)} วินาที` : 'ไม่ระบุ';
+                            const audioPlayerHtml = call.recording_file ? `
+                                <div class="audio-recording-box" style="margin-top:4px;">
+                                    <audio controls style="width:100%; height:32px; border-radius: 6px;" src="/api/recordings/${escapeHtml(call.recording_file)}"></audio>
                                 </div>
                             ` : '';
                             
+                            // Build transcript section if exists
+                            let transcriptHtml = '';
+                            if (call.transcript && call.transcript.length > 0) {
+                                const transcriptId = `transcript-${index}`;
+                                let turnsHtml = '';
+                                call.transcript.forEach(turn => {
+                                    const isUser = turn.role === 'user';
+                                    const senderName = isUser ? 'ลูกค้า' : 'AI';
+                                    const bg = isUser ? 'rgba(79, 70, 229, 0.06)' : 'rgba(244, 244, 245, 0.8)';
+                                    const border = isUser ? 'rgba(79, 70, 229, 0.15)' : 'rgba(228, 228, 231, 0.8)';
+                                    const align = isUser ? 'align-self: flex-end; text-align: right;' : 'align-self: flex-start; text-align: left;';
+                                    turnsHtml += `
+                                        <div style="background:${bg}; border:1px solid ${border}; border-radius:10px; padding:8px 12px; font-size:12px; margin-bottom:6px; max-width:85%; ${align}">
+                                            <strong style="color:var(--text-color); font-size:11px; display:block; margin-bottom:2px;">${senderName} (${turn.time || ''})</strong>
+                                            <span>${escapeHtml(turn.text)}</span>
+                                        </div>
+                                    `;
+                                });
+                                transcriptHtml = `
+                                    <div style="margin-top: 8px;">
+                                        <button class="btn btn-outline" style="padding:4px 10px; font-size:11.5px; border-radius:8px; display:flex; align-items:center; gap:4px; font-weight:600; cursor:pointer;" onclick="const t = document.getElementById('${transcriptId}'); t.style.display = t.style.display === 'none' ? 'flex' : 'none';">
+                                            <span>💬</span> แสดงบทสนทนาทั้งหมด (${call.transcript.length} ข้อความ)
+                                        </button>
+                                        <div id="${transcriptId}" style="display:none; flex-direction:column; gap:4px; background:#fafafa; border:1px solid var(--border-color); border-radius:10px; padding:12px; margin-top:8px; max-height:260px; overflow-y:auto; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+                                            ${turnsHtml}
+                                        </div>
+                                    </div>
+                                `;
+                            }
+                            
                             card.innerHTML = `
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <span style="font-weight:700; color:var(--text-color); font-size:14px;">👤 ${escapeHtml(item.caller_name || 'ลูกค้า')}</span>
-                                    <span class="status-pill info">โทรแล้ว ${item.total_calls || 1} ครั้ง</span>
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <span style="font-weight:700; color:var(--text-color); font-size:14px;">👤 ${escapeHtml(call.caller_name)}</span>
+                                    <span style="font-size:11.5px; background:var(--primary-light); color:var(--primary-color); padding:2px 8px; border-radius:6px; font-weight:700;">⏱️ ${durText}</span>
                                 </div>
-                                <div style="color:var(--text-muted); font-size:11.5px; margin-bottom:6px; font-weight:600;">📞 เบอร์: ${escapeHtml(phone)} | ⏱️ ล่าสุด: ${escapeHtml(item.last_call_time || '')}</div>
-                                <div style="background:#faf9fd; border:1px solid var(--border-color); border-radius:8px; padding:10px; color:var(--text-color); line-height:1.4;"><strong>สรุปผล:</strong> ${escapeHtml(item.last_summary || '')}</div>
+                                <div style="color:var(--text-muted); font-size:11px; font-weight:600;">📞 เบอร์: ${escapeHtml(call.phone)} | 📅 วันที่: ${escapeHtml(call.timestamp)}</div>
+                                <div style="background:#faf9fd; border:1px solid var(--border-color); border-radius:10px; padding:10px; color:var(--text-color); line-height:1.4; font-size:12.5px;"><strong>สรุปผล:</strong> ${escapeHtml(call.summary)}</div>
                                 ${audioPlayerHtml}
+                                ${transcriptHtml}
                             `;
                             logsContainer.appendChild(card);
                         });

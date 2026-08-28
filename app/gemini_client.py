@@ -3,6 +3,9 @@ import logging
 import datetime
 import os
 import time
+import urllib.request
+import urllib.error
+import chromadb
 from app import config
 
 logger = logging.getLogger("VoiceAgent")
@@ -153,9 +156,9 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "end_call",
                             "description": "วางสายและจบการสนทนาทางโทรศัพท์ทันที เมื่อลูกค้ากล่าวขอบคุณ ตอบว่าไม่มีอะไรสอบถามเพิ่มเติมแล้ว หรือปฏิเสธไม่ต้องการถามต่อ",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {
-                                    "reason": {"type": "STRING", "description": "เหตุผลในการวางสาย"}
+                                    "reason": {"type": "string", "description": "เหตุผลในการวางสาย"}
                                 },
                                 "required": []
                             }
@@ -164,12 +167,12 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "book_table",
                             "description": "จองโต๊ะหรือจองห้องประชุมส่วนตัวให้ลูกค้า",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {
-                                    "name": {"type": "STRING", "description": "ชื่อผู้จอง"},
-                                    "phone": {"type": "STRING", "description": "เบอร์โทรศัพท์"},
-                                    "date_time": {"type": "STRING", "description": "วันที่และเวลาที่ต้องการจอง"},
-                                    "guests": {"type": "INTEGER", "description": "จำนวนท่าน"}
+                                    "name": {"type": "string", "description": "ชื่อผู้จอง"},
+                                    "phone": {"type": "string", "description": "เบอร์โทรศัพท์"},
+                                    "date_time": {"type": "string", "description": "วันที่และเวลาที่ต้องการจอง"},
+                                    "guests": {"type": "integer", "description": "จำนวนท่าน"}
                                 },
                                 "required": ["name", "date_time", "guests"]
                             }
@@ -178,9 +181,9 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "check_member_points",
                             "description": "เช็กแต้มสะสมสมาชิกและสิทธิ์ส่วนลดของลูกค้า",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {
-                                    "phone": {"type": "STRING", "description": "เบอร์โทรศัพท์สมาชิก"}
+                                    "phone": {"type": "string", "description": "เบอร์โทรศัพท์สมาชิก"}
                                 },
                                 "required": []
                             }
@@ -189,10 +192,10 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "send_sms_info",
                             "description": "ส่ง SMS สรุปข้อมูลร้านค้า รหัส Wi-Fi หรือแผนที่เข้ามือถือลูกค้า",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {
-                                    "phone": {"type": "STRING", "description": "เบอร์โทรศัพท์รับ SMS"},
-                                    "info_type": {"type": "STRING", "description": "ประเภทข้อมูล เช่น wifi, map, promo"}
+                                    "phone": {"type": "string", "description": "เบอร์โทรศัพท์รับ SMS"},
+                                    "info_type": {"type": "string", "description": "ประเภทข้อมูล เช่น wifi, map, promo"}
                                 },
                                 "required": ["info_type"]
                             }
@@ -201,7 +204,7 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "transfer_call",
                             "description": "โอนสายลูกค้าไปยังเจ้าหน้าที่พนักงานที่เป็นมนุษย์ ทันทีเมื่อลูกค้าแจ้งความประสงค์ต้องการพูดคุยกับเจ้าหน้าที่หรือบุคคลจริง",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {},
                                 "required": []
                             }
@@ -210,9 +213,9 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "check_reservation",
                             "description": "ตรวจสอบข้อมูลการจองโต๊ะหรือจองห้องประชุมส่วนตัวของลูกค้าในระบบด้วยเบอร์โทรศัพท์",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {
-                                    "phone": {"type": "STRING", "description": "เบอร์โทรศัพท์ที่ใช้จอง"}
+                                    "phone": {"type": "string", "description": "เบอร์โทรศัพท์ที่ใช้จอง"}
                                 },
                                 "required": ["phone"]
                             }
@@ -221,9 +224,9 @@ def build_setup_message(system_instruction: str) -> dict:
                             "name": "query_knowledge",
                             "description": "ค้นหารายละเอียดข้อมูลร้านค้า นโยบาย เมนู ราคา หรือโปรโมชั่น เพื่อตอบคำถามของลูกค้าด้วยระบบ RAG",
                             "parameters": {
-                                "type": "OBJECT",
+                                "type": "object",
                                 "properties": {
-                                    "query": {"type": "STRING", "description": "คีย์เวิร์ดหรือข้อความที่ต้องการค้นหา เช่น เวลาเปิดร้าน, โปรโมชั่น, ราคาลาเต้"}
+                                    "query": {"type": "string", "description": "คีย์เวิร์ดหรือข้อความที่ต้องการค้นหา เช่น เวลาเปิดร้าน, โปรโมชั่น, ราคาลาเต้"}
                                 },
                                 "required": ["query"]
                             }
@@ -365,6 +368,45 @@ def execute_send_sms_info(phone: str, info_type: str) -> dict:
         "message": f"จัดส่งข้อความ SMS ข้อมูล {info_type} ไปยังเบอร์ {phone or 'ของคุณ'} เรียบร้อยแล้วค่ะ!"
     }
 
+class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
+    """
+    Custom ChromaDB Embedding Function that uses Gemini text-embedding-004 API.
+    """
+    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+        self.api_key = api_key
+        self.model_name = model_name
+
+    def __call__(self, input: chromadb.Documents) -> chromadb.Embeddings:
+        if not input:
+            return []
+        
+        requests = []
+        for text in input:
+            requests.append({
+                "model": self.model_name,
+                "content": {
+                    "parts": [{"text": text}]
+                }
+            })
+        
+        req_data = {"requests": requests}
+        req_body = json.dumps(req_data).encode("utf-8")
+        url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
+        
+        try:
+            req = urllib.request.Request(
+                url,
+                data=req_body,
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=10) as response:
+                res_data = json.loads(response.read().decode("utf-8"))
+                embeddings = res_data.get("embeddings", [])
+                return [emb.get("values", []) for emb in embeddings]
+        except Exception as e:
+            logger.error(f"Failed to generate Gemini embeddings batch: {e}")
+            raise e
+
 class VectorRAGStore:
     """
     Vector Database RAG Engine powered by ChromaDB & Semantic Vector Space Matching with In-Memory Cache.
@@ -380,11 +422,14 @@ class VectorRAGStore:
 
     def _init_chroma(self):
         try:
-            import chromadb
             os.makedirs(self.storage_dir, exist_ok=True)
             self.chroma_client = chromadb.PersistentClient(path=self.storage_dir)
-            self.collection = self.chroma_client.get_or_create_collection(name="voice_agent_rag")
-            logger.info("ChromaDB Vector Store initialized successfully.")
+            gemini_ef = GeminiEmbeddingFunction(api_key=config.GEMINI_API_KEY)
+            self.collection = self.chroma_client.get_or_create_collection(
+                name="voice_agent_rag",
+                embedding_function=gemini_ef
+            )
+            logger.info("ChromaDB Vector Store initialized successfully with Gemini Embeddings.")
         except Exception as e:
             logger.warning(f"Could not initialize ChromaDB: {e}. Falling back to Vector Space Engine.")
 
