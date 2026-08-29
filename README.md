@@ -1,143 +1,169 @@
-# 🎙️ AI Voice Agent MVP — Real-Time Multimodal Gemini Live Phone Agent
+# 🎙️ APEX AGENT — Enterprise AI Voice Platform
 
-> **Voice Agent MVP** คือระบบผู้ช่วย AI ตอบคำถามและบริการลูกค้าทางโทรศัพท์แบบ Real-Time เสียงพูดโต้ตอบสด (<250ms Latency) ขับเคลื่อนด้วย **Gemini Live Multimodal API (BidiGenerateContent)**, **FastAPI**, **WebSockets** และ **RAG Knowledge Base System** พร้อมสวมบทบาทเป็นพนักงานโทรศัพท์สำหรับธุรกิจ (ตัวอย่าง: DripAI Coffee & Space)
-
----
-
-## 📌 สถานะการพัฒนาตามโครงสร้าง 10 ส่วนหลัก (Project Progress Checklist)
-
-### ✅ สิ่งที่พัฒนาเสร็จเรียบร้อยแล้ว (Completed Features)
-
-- [x] **1. Telephony / Call Simulator Gateway**
-  - [x] ระบบจำลองการโทรเข้าผ่านหน้าเว็บด้วย **iOS Phone Call Simulator Overlay** สไตล์มินิมอล ( White & Soft Gray Theme)
-  - [x] รองรับการระบุชื่อผู้โทร (`Caller Name`) และเบอร์โทรศัพท์ (`Phone Number`) ก่อนเริ่มสาย
-  - [x] สวิตช์ย่อ/ขยายหน้าจอโทรศัพท์ (`Minimize / Close Button`) โดยไม่ตัดสาย เพื่อให้ดูคอนโซลและสลับแท็บไปพร้อมกันได้
-
-- [x] **2. Audio Streaming (Real-Time Bidirectional)**
-  - [x] สตรีมมิ่งเสียงไมโครโฟน 16kHz PCM ผ่าน WebSockets แบบสองทาง (Full-Duplex)
-  - [x] เล่นเสียงตอบกลับความละเอียดสูง 24kHz PCM แบบ Streaming ไร้รอยต่อ
-
-- [x] **3. VAD + Turn Taking + Interruption (Barge-in)**
-  - [x] **Noise Gate Filter (RMS Filter)**: ตัดขยะเสียงเงียบ ป้องกันการส่ง Silence Frame เพื่อให้ Gemini ตรวจจับการเริ่ม/หยุดพูดได้แม่นยำ (<200ms)
-  - [x] **Barge-In Support**: เมื่อผู้ใช้พูดแทรกขณะ AI กำลังพูด ระบบจะหยุดเล่นเสียงทันทีและกลับมาฟังผู้ใช้โดยอัตโนมัติ
-  - [x] **Speech Cutoff Prevention**: ปรับปรุง VAD และการทำงานของลำโพงให้เล่นประโยคเสียงพูดของบอทจนจบประโยคเมื่อมี Tool Call/ end_call() ทำงาน ป้องกันปัญหาสะดุดและตัดจบกลางคัน
-
-- [x] **4. Speech Understanding & Agent Brain**
-  - [x] ใช้ **Gemini 2.5 Flash Native Audio Model (`models/gemini-2.5-flash-native-audio-latest`)** ทำหน้าที่เป็นสมองหลักทั้งฟัง เข้าใจความหมาย และประมวลผลคำตอบ
-
-- [x] **5. Knowledge Base & Vector Database RAG (ChromaDB)**
-  - [x] **Vector Database Engine (ChromaDB)**: เปลี่ยนระบบค้นหา RAG จาก Keyword Search ไปเป็น **Vector Embeddings (ChromaDB)** ค้นหาความหมายเชิงลึก (Semantic Search) ได้แม่นยำแม้ใช้คำไม่ตรงกัน
-  - [x] **Auto Vector Index Sync**: เมื่อแก้ไขหรือเพิ่มข้อมูลในคลังความรู้ Tab 3 ระบบจะทำการ Re-index เวกเตอร์เข้า ChromaDB ในโฟลเดอร์ `data/chroma_db/` โดยอัตโนมัติ
-  - [x] **Interactive RAG Admin (Tab 3)**: หน้าเว็บสำหรับแก้ไข บันทึก เพิ่ม หรือลบข้อมูล FAQ และโปรโมชั่นแบบเรียลไทม์ พร้อม Hot-Reload เข้า Vector Engine
-
-- [x] **6. Agent Tools / Function Calling ("มือ" ของ Agent)**
-  - [x] 🔍 `query_knowledge`: ดึงข้อมูลโปรโมชั่น นโยบาย เมนู และราคาจากคลังความรู้ด้วย RAG Vector Engine
-  - [x] 📅 `book_table`: รับจองโต๊ะ/ห้องประชุม และบันทึกลง `data/reservations.json`
-  - [x] 🎁 `check_member_points`: เช็กแต้มสะสมสมาชิกและสิทธิ์ส่วนลด
-  - [x] 📲 `send_sms_info`: จำลองการส่ง SMS สรุปข้อมูลร้านค้า/รหัส Wi-Fi เข้ามือถือลูกค้า
-  - [x] 📞 `transfer_call`: โอนสายไปยังเจ้าหน้าที่พนักงานมนุษย์
-  - [x] 🛑 `end_call`: กล่าวขอบคุณและวางสายอัตโนมัติโดยรอให้ AI พูดขอบคุณจบประโยคก่อนวางสาย (`Turn Complete` Aware Hangup Timing)
-
-- [x] **7. Customer Memory & Call Audio Recording (ระบบความจำและบันทึกเสียงการโทร)**
-  - [x] บันทึกประวัติการโทรย้อนหลังใน `data/call_logs.json`
-  - [x] เมื่อลูกค้าคนเดิมโทรเข้ามา AI จะดึงความจำย้อนหลังขึ้นมาทักทายชื่อลูกค้าอย่างเป็นกันเอง
-  - [x] **Full Call Audio Recording**: บันทึกเสียงโต้ตอบสองทาง (ทั้งเสียงผู้ใช้และเสียง AI) ลงไฟล์ `.wav` ในโฟลเดอร์ `recordings/` อัตโนมัติทุกสาย
-  - [x] **HTML5 Call Audio Player (Tab 4)**: เครื่องเล่นเสียงบนเว็บฝั่งขวา ให้กดเปิดฟังเสียงการโทรย้อนหลังได้ทันที!
-  - [x] **Tab 4 (📜 ประวัติการโทร & การจอง)**: แสดงรายการประวัติความจำลูกค้าและตารางจองโต๊ะสดบนหน้าเว็บ
-
-- [x] **8. Observability & Latency Monitoring**
-  - [x] **Live Console Breakdown**: แสดงเวลาตอบกลับของ Gemini สดๆ บนหน้าเว็บ เช่น `🔊 [AI AUDIO STREAM] Gemini สตรีมเสียงสด (Latency: 180ms, 24kHz PCM)...`
-  - [x] แสดง RAG Matching Source และ Tool Execution Log อย่างละเอียดแบบเรียลไทม์ พร้อมแยกประเภท Event (Barge-in vs Tool Execution) อย่างชัดเจน
-  - [x] **Unified Live Chat Log**: ปรับปรุงหน้าแชตให้แสดงผลเสียงพูดต่อเนื่องของผู้ใช้รวมอยู่ใน Bubble ก้อนเดียวกันให้อ่านง่าย พร้อมทั้งเปิดการถอดเสียงคำพูดตอบกลับของ AI (`outputTranscription`) มาแสดงในหน้าแชตและประวัติการโทรโต้ตอบแบบเรียลไทม์
+> **APEX AGENT** คือแพลตฟอร์มผู้ช่วยเสียงอัจฉริยะ (AI Voice Agent) ระดับองค์กรที่รองรับการโต้ตอบด้วยเสียงสดแบบสองทางความหน่วงต่ำระดับมิลลิวินาที (Sub-second Latency) ขับเคลื่อนด้วย **Google Gemini Live Multimodal Audio API**, **FastAPI**, **WebSockets**, **ChromaDB Vector Store** และ **ระบบจัดการคลังความรู้ Dynamic Knowledge Management (PDF / CSV / TXT)**
 
 ---
 
-### 🔲 สิ่งที่ยังขาดและแผนพัฒนาต่อ (Future Roadmap / To-Do)
+## ✨ จุดเด่นและฟีเจอร์หลักของระบบ (Current Features)
 
-- [ ] **1. Telephony Real Trunking (เบอร์โทรศัพท์จริง)**
-  - [ ] ทดสอบเชื่อมต่อรับสาย/โทรออกผ่านเบอร์โทรศัพท์จริงด้วย **Twilio Voice SIP / Media Streams** และ Public Ngrok URL
-- [ ] **2. Database Integration**
-  - [ ] อัปเกรดระบบจัดเก็บข้อมูลจากไฟล์ JSON (`knowledge.json`, `call_logs.json`, `reservations.json`) ไปเป็น **PostgreSQL / SQLite** ร่วมกับ **SQLAlchemy ORM**
-- [ ] **3. Multi-Agent & Safety Guardrails**
-  - [ ] ติดตั้ง Topic Enforcer / Guardrails ป้องกัน Jailbreak และควบคุมไม่ให้ AI ตอบเรื่องนอกเหนือจากขอบเขตธุรกิจ
-- [ ] **4. Real SMS / LINE Messaging Integration**
-  - [ ] เชื่อมต่อ API จริงกับ Twilio SMS หรือ LINE Messaging API เพื่อส่งข้อความยืนยันการจอง/รหัส Wi-Fi เข้ามือถือลูกค้าจริงหลังวางสาย
+### 1. ⚡ สตรีมมิ่งเสียงสองทางแบบเรียลไทม์ (Bidirectional Audio Streaming)
+- **สตรีมมิ่งเสียงความเร็วสูง**: รองรับการส่งเสียงไมโครโฟน 16kHz PCM (Mono) จากเบราว์เซอร์ และรับเสียงตอบกลับคุณภาพสูง 24kHz PCM จาก Gemini Live API แบบ Full-Duplex
+- **ประมวลผลเสียงแบบ Native Audio**: ขับเคลื่อนด้วยโมเดล `models/gemini-2.5-flash-native-audio-latest` เข้าใจภาษาไทยและภาษาอังกฤษอย่างลึกซึ้ง ไม่ต้องแปลงเป็นข้อความก่อน (No STT/TTS Pipeline Latency)
+- **ระบบแทรกเสียง (Barge-in / Interruption)**: เมื่อผู้ใช้พูดแทรกขณะ AI กำลังพูด ระบบจะหยุดเล่นเสียงทันทีและกลับมารับฟังคำสั่งใหม่โดยอัตโนมัติ
 
 ---
 
-## 🛠️ โครงสร้างไฟล์ในโปรเจกต์ (Project Structure)
+### 2. 📁 ระบบจัดการคลังความรู้อัตโนมัติ (Dynamic Knowledge Management & Vector RAG)
+- **อัปโหลดเอกสารผ่านหน้าเว็บ (Drag & Drop)**:
+  - 📄 **PDF**: สกัดข้อความจากเอกสาร PDF เมนู นโยบายบริษัท ด้วย `pypdf`
+  - 📊 **CSV**: แปลงข้อมูลรายการสินค้า แคตตาล็อก ราคา เป็นตารางความรู้
+  - 📝 **TXT**: สกัดและจัดระเบียบเนื้อหาข้อความทั่วไป
+- **ระบบตัด Chunk อัจฉริยะ (`semantic_chunk_text`)**: ตัดแบ่งเนื้อหาขนาดยาวพร้อม Overlap เพื่อคงความสมบูรณ์ของความหมาย
+- **Vector Database (ChromaDB + Gemini Embeddings)**:
+  - ใช้ `models/gemini-embedding-001` (3,072 Dimensions) สร้าง Vector Embeddings
+  - ค้นหาคำตอบแบบ Semantic Search แม่นยำ แม้ใช้คำถามที่ไม่ตรงกับคีย์เวิร์ด
+  - มีระบบ In-Memory Fast Cache (<0.1ms) และ Fallback Search เมื่อออฟไลน์
+- **แก้ไขข้อมูลพื้นฐานผ่าน UI**: ปรับแต่งข้อมูลร้านค้า, เวลาทำการ, รหัส Wi-Fi, โปรโมชั่น และ FAQ บนแท็บ **Configure (Admin)** พร้อม Sync เข้า ChromaDB ทันที
+
+---
+
+### 3. 🛠️ เครื่องมือและการทำงานอัตโนมัติ (Function Calling & Tool Integrations)
+- 🔍 **`query_knowledge`**: ค้นหาข้อมูลเชิงลึกจากคลังความรู้ Vector Database
+- 📅 **`book_table`**: รับจองโต๊ะ/นัดหมาย และบันทึกลง `data/reservations.json` ทันที
+- 🎁 **`check_member_points`**: ตรวจสอบคะแนนสะสมและสิทธิ์สมาชิกผ่านเบอร์โทรศัพท์
+- 📲 **`send_sms_info`**: จำลองการส่ง SMS สรุปข้อมูลและลิงก์เข้ามือถือลูกค้า
+- 📞 **`transfer_call`**: ส่งต่อสายไปยังเจ้าหน้าที่หรือเบอร์ปลายทางผ่าน Twilio Call Transfer
+- 🛑 **`end_call`**: ตรวจจับความประสงค์จบการสนทนา กล่าวขอบคุณ และวางสายอัตโนมัติ พร้อมบันทึกเสียงและประวัติการโทร
+
+---
+
+### 4. 🧠 ระบบจดจำลูกค้า & บันทึกเสียงการโทร (Customer Memory & Audio Recording)
+- **จดจำลูกค้าเดิม (Caller Memory)**: เมื่อเบอร์เดิมโทรเข้ามา ระบบจะดึงประวัติการโทรและบริบทก่อนหน้ามาทักทายอย่างเป็นกันเอง
+- **บันทึกเสียงสนทนาสด (.WAV)**: รวมเสียงพูดของลูกค้าและเสียง AI ลงไฟล์ในโฟลเดอร์ `recordings/` แบบเรียลไทม์
+- **วิเคราะห์อารมณ์และเจตนา (Call Intelligence)**: สรุปบทสนทนา (Summary), ตรวจจับอารมณ์ (Sentiment: Positive/Neutral/Negative) และระบุเจตนาหลัก (Primary Intent) บันทึกลง `data/call_logs.json`
+- **เครื่องเล่นเสียงบนเว็บ (Audio Player)**: สามารถกดฟังเสียงย้อนหลังได้จากตารางประวัติการโทรทันที
+
+---
+
+### 5. 📱 หน้าจอจำลองการโทร & แดชบอร์ด (Simulator & Modern Dashboard)
+- **iOS Phone Call Simulator**: หน้าต่างจำลอง iPhone สไตล์กระจกหรูหรา (Glassmorphism):
+  - หน้าโทรสายหลักพร้อมจับเวลาและแสดงสถานะเสียงสด
+  - แป้นกดตัวเลข DTMF (Keypad View)
+  - โหมด FaceTime AI Hologram Orb View
+  - หน้ารายชื่อติดต่อด่วน (Contacts View)
+- **Floating Call Mini-Dock**: แถบควบคุมขนาดเล็กมุมจอลอยตัวเมื่อย่อหน้าจอโทรศัพท์
+- **Live Latency & VAD Console**: แสดงเวลาตอบสนอง (VAD / Speech Start / Playback Start / Tool Invocations) แบบเรียลไทม์
+- **สถิติและกราฟวิเคราะห์ (Dashboard)**: แสดงปริมาณการโทร อัตราความพึงพอใจ และช่วงเวลาที่มีการโทรเข้าสูงสุดผ่าน Chart.js
+
+---
+
+### 6. ☎️ การเชื่อมต่อสัญญาณโทรศัพท์จริง (Telephony / Twilio Integration)
+- มี Endpoint WebSocket `/ws/media-stream` สำหรับรับสายเข้าจากเบอร์โทรศัพท์จริงผ่าน **Twilio Voice Media Streams**
+- รองรับการแปลงสัญญาณเสียงสองทาง (Transcoding) ระหว่าง 8kHz G.711 $\mu$-law และ 16kHz/24kHz Linear PCM
+
+---
+
+## 📂 โครงสร้างโฟลเดอร์และไฟล์ (Project Architecture)
 
 ```text
 AI_VOICE/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py             # FastAPI App, WebSockets Relay & REST API Endpoints
-│   ├── config.py           # Environment Configurations & API Keys
-│   ├── audio.py            # Audio Buffer & PCM Converter Utilities
-│   ├── gemini_client.py    # Gemini Live Bidi Setup, RAG Engine & Function Callings
-│   ├── twilio_client.py    # Twilio REST API Transfer Call Integration
+│   ├── main.py             # FastAPI Server, WebSocket Media Stream, Upload & REST APIs
+│   ├── config.py           # ตัวแปรระบบ, Model Config และ Environment Variables
+│   ├── audio.py            # การบันทึกไฟล์ WAV (CallAudioRecorder) และ Transcoding G.711 / PCM
+│   ├── gemini_client.py    # Gemini Live API Client, ChromaDB Vector Store & Function Tools
+│   ├── twilio_client.py    # Twilio REST API สำหรับการโอนสาย (Call Transfer)
 │   └── templates/
-│       └── phone_modal.html # Standalone iOS Phone Call Simulator Component
+│       ├── index.html      # หน้าจอหลัก Dashboard, Console Sandbox, Dynamic RAG & Logs
+│       └── phone_modal.html # คอมโพเนนต์หน้าต่างจำลองโทรศัพท์ iOS Simulator
 ├── data/
-│   ├── knowledge.json      # RAG Knowledge Base Database
-│   ├── call_logs.json      # Customer Memory & History Database
-│   └── reservations.json   # Table & Meeting Room Bookings Database
-├── run.py                  # Server Launcher Script
-├── requirements.txt        # Python Project Dependencies
-├── .env.example            # Environment Variables Template
-└── README.md               # Project Documentation
+│   ├── documents.json      # ฐานข้อมูลเมตาดาตาเอกสาร Dynamic Knowledge ที่อัปโหลด
+│   ├── knowledge.json      # ข้อมูลความรู้พื้นฐานร้านค้า, FAQ, โปรโมชั่น
+│   ├── call_logs.json      # ประวัติการโทร, ความจำลูกค้า, บทสนทนา และผลวิเคราะห์ Sentiment
+│   ├── reservations.json   # รายการจองโต๊ะและการนัดหมาย
+│   └── chroma_db/          # โฟลเดอร์เก็บ Vector Database ของ ChromaDB (Local Persistent)
+├── recordings/             # โฟลเดอร์จัดเก็บไฟล์เสียงบันทึกการโทร (.wav)
+├── run.py                  # สคริปต์รันเซิร์ฟเวอร์ Uvicorn
+├── requirements.txt        # รายการแพ็กเกจ Python Dependencies
+├── .env.example            # ตัวอย่างไฟล์ตั้งค่า API Key
+└── README.md               # เอกสารประกอบโปรเจกต์
 ```
 
 ---
 
 ## 🚀 ขั้นตอนการติดตั้งและเริ่มใช้งาน (Getting Started)
 
-### 1. คลองโปรเจกต์และติดตั้ง Dependencies
+### 1. โคลนโปรเจกต์และสร้าง Virtual Environment
 ```bash
 git clone https://github.com/xhier2547/voice-agent-mvp.git
 cd voice-agent-mvp
 
-# สร้าง Virtual Environment
+# สร้างและเปิดใช้งาน Virtual Environment
 python -m venv venv
-# สำหรับ Windows Command Prompt / PowerShell:
-venv\Scripts\activate
+# สำหรับ Windows (PowerShell):
+venv\Scripts\Activate.ps1
+# หรือ Command Prompt:
+venv\Scripts\activate.bat
+```
 
-# ติดตั้ง Dependencies
+### 2. ติดตั้ง Dependencies
+```bash
 pip install -r requirements.txt
 ```
 
-### 2. ตั้งค่า Environment Variables (`.env`)
-คัดลอกไฟล์ `.env.example` เป็น `.env` แล้วระบุ **GEMINI_API_KEY** จาก [Google AI Studio](https://aistudio.google.com/):
+### 3. กำหนดค่า Environment Variables (`.env`)
+คัดลอกไฟล์ `.env.example` เป็น `.env` และใส่ **Gemini API Key** ที่ได้รับจาก [Google AI Studio](https://aistudio.google.com/):
 
 ```env
-GEMINI_API_KEY=your_actual_gemini_api_key_here
+GEMINI_API_KEY=AIzaSy...your_gemini_api_key...
 GEMINI_MODEL=models/gemini-2.5-flash-native-audio-latest
 GEMINI_VOICE=Aoede
 PORT=8000
 ```
 
-### 3. สตาร์ทระบบ Server
+*(ตัวเลือกเสริม: หากต้องการทดสอบเบอร์โทรจริง สามารถระบุ `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, และ `TRANSFER_NUMBER` เพิ่มเติมได้)*
+
+### 4. รันเซิร์ฟเวอร์
 ```bash
-python run.py
+py .\run.py
 ```
 
-เปิดเว็บเบราว์เซอร์ไปที่: **`http://localhost:8000/`**
+เปิดเว็บเบราว์เซอร์ไปที่:
+👉 **`http://localhost:8000`**
 
 ---
 
-## 📱 วิธีการทดสอบบน Web Sandbox
+## 🧪 คู่มือการทดสอบระบบ (User Walkthrough)
 
-1. **จำลองการโทรเข้า (Call Simulator)**:
-   - กรอก **ชื่อผู้โทร** (เช่น `Vera Sun`) และ **เบอร์โทรศัพท์** (เช่น `081-234-5678`) ฝั่งซ้าย
-   - กดปุ่ม **"📞 กดเพื่อโทรออก (Call Now)"** เพื่อเริ่มสาย
-2. **โต้ตอบเสียงสด (Speech Interaction)**:
-   - ลองถามคำถาม เช่น *"ร้านเปิดกี่โมง?"*, *"ขอรหัสไวไฟหน่อย"*, หรือ *"ช่วยจองโต๊ะ 4 คน วันพรุ่งนี้บ่ายสอง"*
-   - AI จะตอบกลับเป็นเสียงพูดสดใน **<250ms** พร้อมบันทึกการจองลงแท็บ **"📜 ประวัติการโทร & การจอง"**
-3. **การวางสายอัตโนมัติ**:
-   - เมื่อคุยเสร็จ ให้ตอบกลับว่า **"ไม่มีแล้ว ขอบคุณครับ"** AI จะกล่าวขอบคุณและวางสายให้อัตโนมัติ!
+### 1. ทดสอบการคุยด้วยเสียงสด (Live Voice Testing)
+1. ไปที่แท็บ **Console Sandbox** หรือกดไอคอนโทรศัพท์ด้านบนขวา
+2. ระบุชื่อผู้โทร (เช่น `Vera Sun`) และเบอร์โทรศัพท์
+3. กดปุ่ม **"จำลองโทรเข้า (Call)"** แล้วอนุญาตให้เบราว์เซอร์เข้าถึงไมโครโฟน
+4. พูดคุยกับบอทด้วยภาษาไทยหรืออังกฤษอย่างเป็นธรรมชาติ เช่น:
+   - *"สวัสดีครับ ที่ร้านเปิดปิดกี่โมง มีที่จอดรถไหม"*
+   - *"ช่วยแนะนำโปรโมชั่นเด็ดๆ เดือนนี้หน่อย"*
+   - *"อยากจองโต๊ะสำหรับ 3 คน วันพรุ่งนี้ตอน 18:30 น."*
+5. เมื่อสนทนาเสร็จ สามารถพูดว่า *"ขอบคุณครับ แค่นี้ก่อนนะ"* บอทจะกล่าวขอบคุณและ**วางสายให้อัตโนมัติ**
+
+### 2. ทดสอบอัปโหลดเอกสารความรู้ (Dynamic Knowledge RAG)
+1. ไปที่แท็บ **Configure (Admin)**
+2. ลากไฟล์เอกสาร `.pdf`, `.csv` หรือ `.txt` มาวางในกล่อง **Dropzone**
+3. ระบบจะสกัดข้อความ ตัดเป็น Chunk และสร้าง Vector Embeddings เข้า ChromaDB ทันที
+4. กลับไปที่โทรศัพท์และถามคำถามเกี่ยวกับเนื้อหาในเอกสารที่เพิ่งอัปโหลด AI จะค้นหาและตอบข้อมูลจากเอกสารได้อย่างแม่นยำ
+
+### 3. ตรวจสอบประวัติการโทรและฟังเสียงย้อนหลัง
+1. ไปที่แท็บ **Calls & Reservations**
+2. ตรวจสอบรายการประวัติการโทร ข้อมูล Intent, Sentiment และบทสนทนาย้อนหลัง
+3. กดปุ่ม **Play Audio** เพื่อเปิดฟังเสียงบันทึกการโทรที่ถูกบันทึกไว้ในโฟลเดอร์ `recordings/`
 
 ---
 
-## 📄 License
+## 🔒 ข้อกำหนดและคำแนะนำด้านเทคนิค (Technical Notes)
+- **เบราว์เซอร์**: แนะนำให้ใช้ Google Chrome, Microsoft Edge หรือ Safari เวอร์ชันล่าสุด เพื่อรองรับ Web Audio API และสิทธิ์ไมโครโฟนอย่างสมบูรณ์
+- **โมเดลเวกเตอร์**: ระบบใช้ `models/gemini-embedding-001` ความยาว 3072 มิติ หากไม่มีการเชื่อมต่ออินเทอร์เน็ต ระบบมี In-Memory Cache และ Fallback Engine สำรองให้โดยอัตโนมัติ
 
-MIT License — พัฒนาขึ้นเพื่อเป็นโครงร่างศึกษาและใช้งานสำหรับ AI Voice Agent MVP
+---
+
+## 📄 ใบอนุญาต (License)
+MIT License — พัฒนาและเผยแพร่สำหรับการศึกษาและใช้งานเป็นโซลูชัน AI Voice Agent
