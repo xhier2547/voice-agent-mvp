@@ -2525,92 +2525,117 @@
             }
 
             init(ctx = null) {
-                if (ctx) {
+                if (ctx && (this.audioCtx !== ctx || !this.gainNode)) {
                     this.audioCtx = ctx;
-                } else if (!this.audioCtx) {
+                    this.gainNode = null;
+                } else if (!this.audioCtx || this.audioCtx.state === 'closed') {
                     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+                    this.gainNode = null;
                 }
-                if (!this.gainNode && this.audioCtx) {
-                    this.gainNode = this.audioCtx.createGain();
-                    this.gainNode.gain.value = this.currentGain;
+
+                if (!this.gainNode && this.audioCtx && this.audioCtx.state !== 'closed') {
+                    try {
+                        this.gainNode = this.audioCtx.createGain();
+                        this.gainNode.gain.value = this.currentGain;
+                    } catch(e) {
+                        console.error('Failed to create gainNode:', e);
+                    }
                 }
-                if (this.nextStartTime < this.audioCtx.currentTime) {
-                    this.nextStartTime = this.audioCtx.currentTime;
+
+                if (this.audioCtx && this.audioCtx.state !== 'closed') {
+                    if (this.audioCtx.state === 'suspended') {
+                        this.audioCtx.resume().catch(() => {});
+                    }
+                    if (this.nextStartTime < this.audioCtx.currentTime || isNaN(this.nextStartTime)) {
+                        this.nextStartTime = this.audioCtx.currentTime;
+                    }
                 }
             }
 
             setGain(multiplier) {
                 this.currentGain = multiplier;
-                if (this.gainNode && this.audioCtx) {
-                    this.gainNode.gain.setValueAtTime(multiplier, this.audioCtx.currentTime);
+                if (this.gainNode && this.audioCtx && this.audioCtx.state !== 'closed') {
+                    try {
+                        this.gainNode.gain.setValueAtTime(multiplier, this.audioCtx.currentTime);
+                    } catch(e) {}
                 }
             }
 
             playChunk(pcm16Base64) {
-                this.init();
-                if (this.audioCtx.state === 'suspended') {
-                    this.audioCtx.resume();
-                }
-
-                const binaryString = window.atob(pcm16Base64);
-                const len = binaryString.length;
-                const bytes = new Uint8Array(len);
-                for (let i = 0; i < len; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-
-                const pcm16 = new Int16Array(bytes.buffer);
-                const float32 = new Float32Array(pcm16.length);
-                for (let i = 0; i < pcm16.length; i++) {
-                    float32[i] = pcm16[i] / 32768.0;
-                }
-
-                const audioBuffer = this.audioCtx.createBuffer(1, float32.length, this.sampleRate);
-                audioBuffer.copyToChannel(float32, 0);
-
-                const source = this.audioCtx.createBufferSource();
-                source.buffer = audioBuffer;
-                
-                // Route: source -> gainNode -> (outputAnalyst) -> destination
-                source.connect(this.gainNode);
-                if (outputAnalyst) {
-                    try { this.gainNode.disconnect(); } catch(e){}
-                    this.gainNode.connect(outputAnalyst);
-                } else {
-                    try { this.gainNode.disconnect(); } catch(e){}
-                    this.gainNode.connect(this.audioCtx.destination);
-                }
-
-                const currentTime = this.audioCtx.currentTime;
-                if (this.nextStartTime < currentTime) {
-                    this.nextStartTime = currentTime;
-                }
-                
-                source.start(this.nextStartTime);
-                this.nextStartTime += audioBuffer.duration;
-                this.activeSources.push(source);
-                
-                if (this.onPlaybackStateChange) {
-                    this.onPlaybackStateChange(true);
-                }
-
-                source.onended = () => {
-                    const idx = this.activeSources.indexOf(source);
-                    if (idx > -1) this.activeSources.splice(idx, 1);
-                    if (this.activeSources.length === 0 && this.onPlaybackStateChange) {
-                        this.onPlaybackStateChange(false);
+                try {
+                    this.init(this.audioCtx);
+                    if (!this.audioCtx || this.audioCtx.state === 'closed') return;
+                    
+                    if (this.audioCtx.state === 'suspended') {
+                        this.audioCtx.resume().catch(() => {});
                     }
-                };
+
+                    const binaryString = window.atob(pcm16Base64);
+                    const len = binaryString.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+
+                    const pcm16 = new Int16Array(bytes.buffer);
+                    const float32 = new Float32Array(pcm16.length);
+                    for (let i = 0; i < pcm16.length; i++) {
+                        float32[i] = pcm16[i] / 32768.0;
+                    }
+
+                    const audioBuffer = this.audioCtx.createBuffer(1, float32.length, this.sampleRate);
+                    audioBuffer.copyToChannel(float32, 0);
+
+                    const source = this.audioCtx.createBufferSource();
+                    source.buffer = audioBuffer;
+                    
+                    // Route: source -> gainNode -> (outputAnalyst) -> destination
+                    if (this.gainNode) {
+                        source.connect(this.gainNode);
+                        if (outputAnalyst) {
+                            try { this.gainNode.disconnect(); } catch(e){}
+                            this.gainNode.connect(outputAnalyst);
+                        } else {
+                            try { this.gainNode.disconnect(); } catch(e){}
+                            this.gainNode.connect(this.audioCtx.destination);
+                        }
+                    } else {
+                        source.connect(this.audioCtx.destination);
+                    }
+
+                    const currentTime = this.audioCtx.currentTime;
+                    if (this.nextStartTime < currentTime || isNaN(this.nextStartTime)) {
+                        this.nextStartTime = currentTime;
+                    }
+                    
+                    source.start(this.nextStartTime);
+                    this.nextStartTime += audioBuffer.duration;
+                    this.activeSources.push(source);
+                    
+                    if (this.onPlaybackStateChange) {
+                        this.onPlaybackStateChange(true);
+                    }
+
+                    source.onended = () => {
+                        const idx = this.activeSources.indexOf(source);
+                        if (idx > -1) this.activeSources.splice(idx, 1);
+                        if (this.activeSources.length === 0 && this.onPlaybackStateChange) {
+                            this.onPlaybackStateChange(false);
+                        }
+                    };
+                } catch(err) {
+                    console.error('Error playing audio chunk in player:', err);
+                }
             }
 
             clear() {
                 this.activeSources.forEach(source => {
-                    try {
-                        source.stop();
-                    } catch(e) {}
+                    try { source.stop(); } catch(e) {}
+                    try { source.disconnect(); } catch(e) {}
                 });
                 this.activeSources = [];
-                if (this.audioCtx) {
+                this.nextStartTime = 0;
+                if (this.audioCtx && this.audioCtx.state !== 'closed') {
                     this.nextStartTime = this.audioCtx.currentTime;
                 }
                 if (this.onPlaybackStateChange) {
@@ -2976,6 +3001,9 @@
                     ws.send(JSON.stringify({ event: 'setup', name: cName, phone: cPhone }));
 
                     audioContext = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'interactive' });
+                    if (audioContext.state === 'suspended') {
+                        audioContext.resume().catch(() => {});
+                    }
                     
                     // Setup analysts for Wave visualization
                     inputAnalyst = audioContext.createAnalyser();
@@ -3276,14 +3304,20 @@
             }
             
             if (audioContext) {
-                if (audioContext.state !== 'closed') audioContext.close();
+                if (audioContext.state !== 'closed') {
+                    try { audioContext.close(); } catch(e){}
+                }
                 audioContext = null;
             }
 
             inputAnalyst = null;
             outputAnalyst = null;
-            player.clear();
-            player.audioCtx = null;
+            if (player) {
+                player.clear();
+                player.gainNode = null;
+                player.audioCtx = null;
+                player.nextStartTime = 0;
+            }
 
             if (mainAvatarBtn) {
                 mainAvatarBtn.className = 'avatar-mic-btn';
