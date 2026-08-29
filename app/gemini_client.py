@@ -43,6 +43,14 @@ def get_caller_memory(phone: str = None, name: str = None, logs_path: str = "dat
     
     return ""
 
+def get_company_name(knowledge_path: str = "data/knowledge.json") -> str:
+    try:
+        with open(knowledge_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("company_name", "APEX AGENT")
+    except Exception:
+        return "APEX AGENT"
+
 def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_name: str = None, caller_phone: str = None) -> str:
     """
     Reads the knowledge base JSON file and builds a customized System Prompt.
@@ -53,24 +61,26 @@ def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_n
     except Exception as e:
         logger.warning(f"Could not load knowledge base from {knowledge_path}: {e}")
         data = {
-            "company_name": "DripAI Coffee & Space",
+            "company_name": "APEX AGENT",
             "operating_hours": "เปิดให้บริการทุกวัน เวลา 07:00 น. ถึง 20:00 น.",
-            "location": "ชั้น 1 อาคารทรู ดิจิทัล พาร์ค สุขุมวิท 101 กรุงเทพฯ",
+            "location": "กรุงเทพฯ",
             "contact_number": "02-123-4567",
-            "wifi_password": "DripAICoffeeGuest (ความเร็ว 500/500 Mbps)",
+            "wifi_password": "Guest (ความเร็ว 500/500 Mbps)",
         }
 
+    company = data.get("company_name", "APEX AGENT")
     promos_list = data.get("promotions", [])
     promos_str = "\n".join([f"  • {p.get('name')}: {p.get('detail')}" for p in promos_list]) if promos_list else "  • ไม่มีโปรโมชั่นในขณะนี้"
 
     faq_list = data.get("faq", [])
     faq_str = "\n".join([f"  • ถาม: {f.get('question')}\n    ตอบ: {f.get('answer')}" for f in faq_list]) if faq_list else "  • ไม่มี"
 
-    prompt = f"""คุณคือพนักงานบริการลูกค้าของ "{data.get('company_name', '')}"
+    prompt = f"""คุณคือพนักงานบริการลูกค้าของร้าน "{company}"
 
 ตอบภาษาไทย สั้น กระชับ คุยอย่างเป็นธรรมชาติเหมือนเพื่อนมนุษย์คุยกันจริงๆ
 
 ข้อมูลร้านค้าและโปรโมชั่น (พร้อมตอบลูกค้าได้ทันทีใน 0.6 วินาทีโดยไม่ต้องเรียกใช้ Tool):
+- ชื่อร้าน / บริษัท: {company}
 - เวลาเปิด: {data.get('operating_hours', '')}
 - สถานที่: {data.get('location', '')}
 - เบอร์ติดต่อ: {data.get('contact_number', '')}
@@ -242,9 +252,10 @@ def execute_end_call(reason: str = None) -> dict:
     """
     Executes end call action.
     """
+    company = get_company_name()
     return {
         "status": "success",
-        "message": f"ขอบคุณที่ใช้บริการ DripAI Coffee วางสายเรียบร้อยแล้ว ({reason or 'จบการสนทนา'})"
+        "message": f"ขอบคุณที่ใช้บริการร้าน {company} วางสายเรียบร้อยแล้ว ({reason or 'จบการสนทนา'})"
     }
 
 def execute_book_table(name: str, phone: str, date_time: str, guests: int, res_path: str = "data/reservations.json") -> dict:
@@ -462,6 +473,11 @@ class VectorRAGStore:
         docs = []
         metas = []
         ids = []
+
+        if data.get("company_name"):
+            docs.append(f"ชื่อร้านค้าหรือบริษัท: {data['company_name']}")
+            metas.append({"section": "ชื่อร้านค้า (Company Name)", "type": "info"})
+            ids.append("info_company")
 
         if data.get("operating_hours"):
             docs.append(f"เวลาเปิดทำการ: {data['operating_hours']}")

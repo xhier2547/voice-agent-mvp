@@ -1,9 +1,9 @@
 {
-  "company_name": "DripAI Coffee & Space",
-  "operating_hours": "เปิดให้บริการทุกวัน เวลา 07:00 น. ถึง 20:00 น.",
+  "company_name": "มารสวรรค์",
+  "operating_hours": "เปิดให้บริการทุกวัน เวลา 07:00 น. ถึง 24:00 น.",
   "location": "ชั้น 1 อาคารทรู ดิจิทัล พาร์ค สุขุมวิท 101 กรุงเทพฯ (มีที่จอดรถฟรี 3 ชั่วโมง สำหรับลูกค้า)",
   "contact_number": "02-123-4567",
-  "wifi_password": "DripAICoffeeGuest (ความเร็ว 500/500 Mbps)",
+  "wifi_password": "00000001R_ (ความเร็ว 500/500 Mbps)",
   "promotions": [
     {
       "name": "โปรโมชั่นต้อนรับวันจันทร์",
@@ -29,7 +29,7 @@
     },
     {
       "question": "มีบริการเดลิเวอรี่ไหม",
-      "answer": "มีครับ สามารถสั่งผ่าน GrabFood, LINE MAN และ Foodpanda โดยค้นหาชื่อร้าน 'DripAI Coffee & Space' ได้เลยครับ"
+      "answer": "มีครับ สามารถสั่งผ่าน GrabFood, LINE MAN และ Foodpanda โดยค้นหาชื่อร้านของเราได้เลยครับ"
     },
     {
       "question": "มีกาแฟไม่มีคาเฟอีนไหม",

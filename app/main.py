@@ -339,7 +339,8 @@ def analyze_call_intelligence(transcript_list: list) -> dict:
         text = turn.get("text", "")
         formatted_transcript += f"{role}: {text}\n"
 
-    prompt = f"""ต่อไปนี้คือบทสนทนาระหว่างลูกค้าและผู้ช่วย AI ทางโทรศัพท์ของร้าน DripAI Coffee & Space:
+    company = gemini_client.get_company_name()
+    prompt = f"""ต่อไปนี้คือบทสนทนาระหว่างลูกค้าและผู้ช่วย AI ทางโทรศัพท์ของร้าน {company}:
 
 {formatted_transcript}
 
@@ -480,11 +481,11 @@ async def get_index():
             data = json.load(f)
     except Exception:
         data = {
-            "company_name": "DripAI Coffee & Space",
+            "company_name": "APEX AGENT",
             "operating_hours": "เปิดให้บริการทุกวัน เวลา 07:00 น. ถึง 20:00 น.",
-            "location": "ชั้น 1 อาคารทรู ดิจิทัล พาร์ค สุขุมวิท 101 กรุงเทพฯ",
+            "location": "กรุงเทพฯ",
             "contact_number": "02-123-4567",
-            "wifi_password": "DripAICoffeeGuest (ความเร็ว 500/500 Mbps)",
+            "wifi_password": "Guest (ความเร็ว 500/500 Mbps)",
             "promotions": [],
             "faq": []
         }
@@ -516,7 +517,7 @@ async def get_index():
 
     # Perform simple template replacements
     html_content = html_template
-    html_content = html_content.replace("{{COMPANY_NAME}}", data.get("company_name", "DripAI Coffee & Space"))
+    html_content = html_content.replace("{{COMPANY_NAME}}", data.get("company_name", "APEX AGENT"))
     html_content = html_content.replace("{{OPERATING_HOURS}}", data.get("operating_hours", ""))
     html_content = html_content.replace("{{LOCATION}}", data.get("location", ""))
     html_content = html_content.replace("{{CONTACT_NUMBER}}", data.get("contact_number", ""))
@@ -651,8 +652,8 @@ async def handle_media_stream(twilio_ws: WebSocket):
                         if "setupComplete" in data:
                             print("DEBUG: Gemini Live API setup complete.", flush=True)
                             setup_event.set()
-                            # Trigger initial welcoming greeting for Twilio
-                            greeting_prompt = "กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน DripAI Coffee & Space (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
+                            company = gemini_client.get_company_name()
+                            greeting_prompt = f"กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน {company} (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
                             trigger_msg = {
                                 "clientContent": {
                                     "turns": [
@@ -1109,8 +1110,8 @@ async def handle_local_stream(client_ws: WebSocket):
                             print("DEBUG: Gemini Live API setup complete for local stream.", flush=True)
                             setup_event.set()
                             await client_ws.send_json({"event": "status", "text": "Ready to chat! Start speaking..."})
-                            # Trigger initial welcoming greeting for local stream
-                            greeting_prompt = "กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน DripAI Coffee & Space (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
+                            company = gemini_client.get_company_name()
+                            greeting_prompt = f"กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน {company} (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
                             trigger_msg = {
                                 "clientContent": {
                                     "turns": [
