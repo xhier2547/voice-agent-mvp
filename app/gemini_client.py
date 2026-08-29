@@ -90,9 +90,10 @@ def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_n
     prompt += """
 
 กฎเหล็กควบคุมขอบเขตบทสนทนา (Strict Guardrails & Focus):
-1. **รักษาบทบาทและขอบเขตบริการ**: คุณคือพนักงานบริการของร้าน DripAI Coffee & Space ให้ข้อมูลเฉพาะเรื่องที่เกี่ยวกับร้าน (เวลาเปิด-ปิด, สถานที่, เมนู, โปรโมชั่น, การจองโต๊ะ, สมาชิก และการโอนสาย) เท่านั้น
-2. **จัดการการพูดออกนอกเรื่อง (Off-Topic Steering)**: หากลูกค้าชวนคุยเรื่องทั่วไปที่ไม่เกี่ยวกับร้าน (เช่น ดินฟ้าอากาศ, การเมือง, ข่าวสาร) ให้ตอบรับสั้นๆ สุภาพ แล้วดึงบทสนทนากลับเข้าเรื่องบริการของร้านทันที เช่น "เรื่องนั้นน่าสนใจมากเลยค่ะ! แต่สำหรับวันนี้หากต้องการสอบถามข้อมูลร้านหรือจองโต๊ะ DripAI ยินดีดูแลให้อย่างเต็มที่เลยค่ะ"
-3. **ป้องกันข้อมูลเท็จ (No Hallucination)**: หากเป็นข้อมูลเฉพาะที่ไม่มีในระบบ ให้ใช้ Tool `query_knowledge` ค้นหาก่อน หรือเสนอโอนสายไปหาเจ้าหน้าที่มนุษย์ด้วย `transfer_call`
+1. **รักษาบทบาทและขอบเขตบริการ**: คุณคือพนักงานบริการของแบรนด์และองค์กรนี้ (APEX AGENT Platform) ให้ข้อมูลเฉพาะเรื่องที่เกี่ยวกับร้านและเอกสารข้อมูลระบบเท่านั้น
+2. **จัดการการพูดออกนอกเรื่อง (Off-Topic Steering)**: หากลูกค้าชวนคุยเรื่องทั่วไปที่ไม่เกี่ยวกับระบบ (เช่น ดินฟ้าอากาศ, การเมือง, ข่าวสาร) ให้ตอบรับสั้นๆ สุภาพ แล้วดึงบทสนทนากลับเข้าเรื่องบริการทันที เช่น "เรื่องนั้นน่าสนใจมากเลยค่ะ! แต่สำหรับวันนี้หากต้องการสอบถามข้อมูลบริการหรือจองนัดหมาย APEX AGENT ยินดีดูแลให้อย่างเต็มที่เลยค่ะ"
+3. **ตอบกลับสดรวดเร็วทันทีระดับ sub-second (< 1 วินาที)**: ข้อมูลพื้นฐานบริการมีครบถ้วนในคำสั่งนี้แล้ว ให้ตอบลูกค้าด้วยเสียงสดทันทีโดยไม่ต้องเรียกใช้ Tool `query_knowledge`! ให้ใช้ `query_knowledge` เฉพาะเมื่อเป็นคำถามลึกซึ้งในเอกสารที่ไม่อยู่ในข้อมูลพื้นฐานเท่านั้น
+4. **การค้นหาเอกสาร Dynamic Knowledge**: หากเป็นคำถามเฉพาะทางหรือรายละเอียดลึกซึ้ง ให้ใช้ `query_knowledge` ค้นหาข้อมูลจากเอกสาร PDF/CSV/TXT ที่อัปโหลดในระบบแล้วนำมาตอบสั้นๆ 1-2 ประโยค
 
 เทคนิคการสนทนาให้ลื่นไหลและเป็นธรรมชาติ (Natural Conversational Voice Persona):
 1. **ใช้คำเกริ่นตอบรับอย่างเป็นธรรมชาติ (Active Listening & Empathy)**: เริ่มต้นด้วยคำตอบรับที่แสดงอารมณ์ร่วมและใส่ใจ เช่น "ฟังดูน่าสนใจมากเลยค่ะ!", "ยินดีเลยค่ะ!", "ได้เลยครับ!", "ยินดีด้วยนะคะ!", "ยอดเยี่ยมเลยค่ะ!"
@@ -104,7 +105,7 @@ def get_system_instruction(knowledge_path: str = "data/knowledge.json", caller_n
 
 กฎเหล็กสำหรับการจบสาย (End Call - Anti Loop):
 - เมื่อลูกค้าพูดว่า "ไม่มีอะไรแล้ว", "ไม่มีอะไรถามแล้ว", "พอแค่นี้", "ขอบคุณนะ", "ลาก่อน" หรือแสดงเจตนาจบสนทนา ให้ทำตามขั้นตอนนี้ **เพียงครั้งเดียว**:
-  1. พูดขอบคุณสั้นๆ ไม่เกิน 1 ประโยค เช่น "ขอบคุณที่โทรมาค่ะ DripAI ยินดีให้บริการเสมอค่ะ"
+  1. พูดขอบคุณสั้นๆ ไม่เกิน 1 ประโยค เช่น "ขอบคุณที่ติดต่อเข้ามาค่ะ APEX AGENT ยินดีให้บริการเสมอค่ะ"
   2. เรียก end_call() ทันทีหลังพูดจบ
 - **ห้ามพูดขอบคุณซ้ำเด็ดขาด** ห้ามเริ่มประโยคขอบคุณใหม่หลังจากพูดจบแล้ว ไม่ว่าจะเกิดอะไรขึ้น
 - **ห้ามถามซ้ำ** ว่า "มีอะไรอีกไหม" หลังจากลูกค้าบอกว่าไม่มีแล้ว"""
@@ -135,8 +136,8 @@ def build_setup_message(system_instruction: str) -> dict:
             "realtimeInputConfig": {
                 "automaticActivityDetection": {
                     "disabled": False,
-                    "prefixPaddingMs": 40,
-                    "silenceDurationMs": 200
+                    "prefixPaddingMs": 20,
+                    "silenceDurationMs": 100
                 }
             },
             "inputAudioTranscription": {},
@@ -370,9 +371,9 @@ def execute_send_sms_info(phone: str, info_type: str) -> dict:
 
 class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
     """
-    Custom ChromaDB Embedding Function that uses Gemini text-embedding-004 API.
+    Custom ChromaDB Embedding Function that uses Gemini Embedding API (gemini-embedding-001).
     """
-    def __init__(self, api_key: str, model_name: str = "models/text-embedding-004"):
+    def __init__(self, api_key: str, model_name: str = "models/gemini-embedding-001"):
         self.api_key = api_key
         self.model_name = model_name
 
@@ -391,7 +392,8 @@ class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
         
         req_data = {"requests": requests}
         req_body = json.dumps(req_data).encode("utf-8")
-        url = f"https://generativelanguage.googleapis.com/v1beta/{self.model_name}:batchEmbedContents?key={self.api_key}"
+        clean_model = self.model_name if self.model_name.startswith("models/") else f"models/{self.model_name}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{clean_model}:batchEmbedContents?key={self.api_key}"
         
         try:
             req = urllib.request.Request(
@@ -399,12 +401,12 @@ class GeminiEmbeddingFunction(chromadb.EmbeddingFunction):
                 data=req_body,
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req, timeout=10) as response:
+            with urllib.request.urlopen(req, timeout=5) as response:
                 res_data = json.loads(response.read().decode("utf-8"))
                 embeddings = res_data.get("embeddings", [])
                 return [emb.get("values", []) for emb in embeddings]
         except Exception as e:
-            logger.error(f"Failed to generate Gemini embeddings batch: {e}")
+            logger.debug(f"Gemini embeddings API call info: {e}")
             raise e
 
 class VectorRAGStore:
@@ -425,10 +427,23 @@ class VectorRAGStore:
             os.makedirs(self.storage_dir, exist_ok=True)
             self.chroma_client = chromadb.PersistentClient(path=self.storage_dir)
             gemini_ef = GeminiEmbeddingFunction(api_key=config.GEMINI_API_KEY)
-            self.collection = self.chroma_client.get_or_create_collection(
-                name="voice_agent_rag",
-                embedding_function=gemini_ef
-            )
+            try:
+                self.collection = self.chroma_client.get_or_create_collection(
+                    name="voice_agent_rag",
+                    embedding_function=gemini_ef
+                )
+            except Exception as e:
+                if "Embedding function conflict" in str(e) or "already exists" in str(e):
+                    try:
+                        self.chroma_client.delete_collection("voice_agent_rag")
+                    except Exception:
+                        pass
+                    self.collection = self.chroma_client.create_collection(
+                        name="voice_agent_rag",
+                        embedding_function=gemini_ef
+                    )
+                else:
+                    raise e
             logger.info("ChromaDB Vector Store initialized successfully with Gemini Embeddings.")
         except Exception as e:
             logger.warning(f"Could not initialize ChromaDB: {e}. Falling back to Vector Space Engine.")
@@ -480,6 +495,28 @@ class VectorRAGStore:
             metas.append({"section": f"FAQ: {faq.get('question')}", "type": "faq"})
             ids.append(f"faq_{idx}")
 
+        # Also sync dynamic uploaded documents
+        try:
+            with open("data/documents.json", "r", encoding="utf-8") as f:
+                dyn_docs = json.load(f)
+            for d in dyn_docs:
+                d_chunks = d.get("chunks", [])
+                d_id = d.get("doc_id", "")
+                d_filename = d.get("filename", "document")
+                d_type = d.get("source_type", "txt")
+                for idx, chunk in enumerate(d_chunks):
+                    doc_text = f"เอกสารข้อมูล [{d_filename}]: {chunk}"
+                    docs.append(doc_text)
+                    metas.append({
+                        "doc_id": d_id,
+                        "filename": d_filename,
+                        "section": f"เอกสาร {d_filename} (ส่วนที่ {idx+1})",
+                        "type": d_type
+                    })
+                    ids.append(f"doc_{d_id}_chunk_{idx}")
+        except Exception:
+            pass
+
         self.documents = docs
         self.metadatas = metas
 
@@ -493,6 +530,70 @@ class VectorRAGStore:
                 logger.info(f"Indexed {len(docs)} documents into ChromaDB Vector Store.")
             except Exception as e:
                 logger.warning(f"Failed to upsert to ChromaDB: {e}")
+
+    def ingest_dynamic_document(self, doc_id: str, filename: str, chunks: list, source_type: str = "pdf"):
+        """
+        Embeds and indexes document chunks into ChromaDB Vector Store.
+        """
+        if not chunks:
+            return
+
+        self.cache.clear()
+        docs = []
+        metas = []
+        ids = []
+
+        for idx, chunk in enumerate(chunks):
+            doc_text = f"เอกสารข้อมูล [{filename}]: {chunk}"
+            docs.append(doc_text)
+            metas.append({
+                "doc_id": doc_id,
+                "filename": filename,
+                "section": f"เอกสาร {filename} (ส่วนที่ {idx+1})",
+                "type": source_type
+            })
+            ids.append(f"doc_{doc_id}_chunk_{idx}")
+
+            self.documents.append(doc_text)
+            self.metadatas.append({
+                "doc_id": doc_id,
+                "filename": filename,
+                "section": f"เอกสาร {filename} (ส่วนที่ {idx+1})",
+                "type": source_type
+            })
+
+        if self.collection and docs:
+            try:
+                self.collection.upsert(
+                    documents=docs,
+                    metadatas=metas,
+                    ids=ids
+                )
+                logger.info(f"Indexed {len(docs)} chunks for dynamic document '{filename}' into ChromaDB Vector Store.")
+            except Exception as e:
+                logger.warning(f"Failed to upsert dynamic document to ChromaDB: {e}")
+
+    def delete_dynamic_document(self, doc_id: str):
+        """
+        Removes dynamic document chunks from ChromaDB and memory.
+        """
+        self.cache.clear()
+        if self.collection:
+            try:
+                self.collection.delete(where={"doc_id": doc_id})
+                logger.info(f"Deleted dynamic document '{doc_id}' from ChromaDB Vector Store.")
+            except Exception as e:
+                logger.warning(f"Failed to delete dynamic document from ChromaDB: {e}")
+
+        # Filter out from in-memory documents
+        keep_docs = []
+        keep_metas = []
+        for d, m in zip(self.documents, self.metadatas):
+            if m.get("doc_id") != doc_id:
+                keep_docs.append(d)
+                keep_metas.append(m)
+        self.documents = keep_docs
+        self.metadatas = keep_metas
 
     def query(self, query_text: str) -> dict:
         """

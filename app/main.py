@@ -3,15 +3,184 @@ import asyncio
 import logging
 import datetime
 import time
-from fastapi import FastAPI, WebSocket, Request, Response, Body
+import re
 import os
+import io
+import csv
+import uuid
+import pypdf
+from fastapi import FastAPI, WebSocket, Request, Response, Body, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 import websockets
 from app import config, audio, twilio_client, gemini_client
 
-logger = logging.getLogger("VoiceAgent")
+logger = logging.getLogger("APEX_AGENT")
 
-app = FastAPI()
+app = FastAPI(title="APEX AGENT Platform")
+
+def extract_text_from_file_bytes(content_bytes: bytes, filename: str) -> tuple[str, str]:
+    """
+    Extracts text from PDF, CSV, or TXT file bytes.
+    Returns (extracted_text, source_type).
+    """
+    ext = os.path.splitext(filename)[1].lower()
+    text = ""
+    source_type = "txt"
+
+    if ext == ".pdf":
+        source_type = "pdf"
+        try:
+            pdf_reader = pypdf.PdfReader(io.BytesIO(content_bytes))
+            for page in pdf_reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        except Exception as e:
+            logger.error(f"PDF extraction error: {e}")
+
+    elif ext == ".csv":
+        source_type = "csv"
+        try:
+            decoded = content_bytes.decode("utf-8-sig", errors="ignore")
+            reader = csv.reader(io.StringIO(decoded))
+            rows_str = []
+            for row in reader:
+                if row:
+                    rows_str.append(" | ".join([cell.strip() for cell in row if cell.strip()]))
+            text = "\n".join(rows_str)
+        except Exception as e:
+            logger.error(f"CSV extraction error: {e}")
+
+    else:
+        source_type = "txt"
+        try:
+            text = content_bytes.decode("utf-8", errors="ignore")
+        except Exception as e:
+            logger.error(f"TXT extraction error: {e}")
+
+    return text.strip(), source_type
+
+
+def semantic_chunk_text(text: str, chunk_size: int = 400, overlap: int = 50) -> list[str]:
+    """
+    Splits long text into overlapping chunks suitable for RAG vector embeddings.
+    """
+    if not text:
+        return []
+
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    chunks = []
+    start = 0
+    text_len = len(text)
+
+    while start < text_len:
+        end = start + chunk_size
+        if end >= text_len:
+            chunks.append(text[start:].strip())
+            break
+
+        break_point = text.rfind('\n', start, end)
+        if break_point == -1 or break_point <= start:
+            break_point = text.rfind(' ', start, end)
+
+        if break_point == -1 or break_point <= start:
+            break_point = end
+
+        chunk = text[start:break_point].strip()
+        if chunk:
+            chunks.append(chunk)
+
+        start = max(start + 1, break_point - overlap)
+
+    return chunks
+
+
+@app.post("/api/knowledge/upload")
+async def upload_document_api(file: UploadFile = File(...)):
+    try:
+        content_bytes = await file.read()
+        filename = file.filename or "uploaded_doc.txt"
+        
+        extracted_text, source_type = extract_text_from_file_bytes(content_bytes, filename)
+        if not extracted_text:
+            return JSONResponse({"status": "error", "message": "ไม่สามารถสกัดข้อความจากไฟล์ที่อัปโหลดได้ (ไฟล์ว่างหรือรูปแบบไม่ถูกต้อง)"}, status_code=400)
+
+        chunks = semantic_chunk_text(extracted_text, chunk_size=400, overlap=50)
+        doc_id = f"doc_{uuid.uuid4().hex[:8]}"
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        try:
+            with open("data/documents.json", "r", encoding="utf-8") as f:
+                documents = json.load(f)
+        except Exception:
+            documents = []
+
+        doc_meta = {
+            "doc_id": doc_id,
+            "filename": filename,
+            "source_type": source_type,
+            "file_size_bytes": len(content_bytes),
+            "chunk_count": len(chunks),
+            "uploaded_at": now_str,
+            "chunks": chunks
+        }
+        documents.insert(0, doc_meta)
+
+        with open("data/documents.json", "w", encoding="utf-8") as f:
+            json.dump(documents, f, ensure_ascii=False, indent=2)
+
+        gemini_client.vector_rag_engine.ingest_dynamic_document(
+            doc_id=doc_id,
+            filename=filename,
+            chunks=chunks,
+            source_type=source_type
+        )
+
+        logger.info(f"Indexed document '{filename}' ({len(chunks)} chunks) into APEX AGENT ChromaDB.")
+        return {
+            "status": "success",
+            "message": f"อัปโหลดและดรรชนีเอกสาร '{filename}' สำเร็จ! ({len(chunks)} Chunks)",
+            "data": doc_meta
+        }
+    except Exception as e:
+        logger.error(f"Error processing uploaded document: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.get("/api/knowledge/documents")
+async def get_documents_api():
+    try:
+        try:
+            with open("data/documents.json", "r", encoding="utf-8") as f:
+                documents = json.load(f)
+        except Exception:
+            documents = []
+        return {"status": "success", "data": documents}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@app.delete("/api/knowledge/documents/{doc_id}")
+async def delete_document_api(doc_id: str):
+    try:
+        try:
+            with open("data/documents.json", "r", encoding="utf-8") as f:
+                documents = json.load(f)
+        except Exception:
+            documents = []
+
+        updated_docs = [d for d in documents if d.get("doc_id") != doc_id]
+
+        with open("data/documents.json", "w", encoding="utf-8") as f:
+            json.dump(updated_docs, f, ensure_ascii=False, indent=2)
+
+        gemini_client.vector_rag_engine.delete_dynamic_document(doc_id)
+
+        return {"status": "success", "message": "ลบเอกสารออกจากระบบและ Vector Store เรียบร้อยแล้ว!"}
+    except Exception as e:
+        logger.error(f"Error deleting document {doc_id}: {e}")
+        return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
 
 @app.get("/api/knowledge")
 async def get_knowledge_api():
@@ -52,6 +221,88 @@ async def get_reservations_api():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+@app.get("/api/analytics/sentiment-intent")
+async def get_sentiment_intent_analytics_api():
+    try:
+        try:
+            with open("data/call_logs.json", "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = {}
+            
+        sentiment_counts = {"Positive": 0, "Neutral": 0, "Negative": 0}
+        intent_counts = {}
+        total_calls = 0
+        customer_list = []
+        
+        for phone, customer_data in logs.items():
+            cust_name = customer_data.get("caller_name", "ลูกค้า")
+            c_calls = customer_data.get("total_calls", 0)
+            last_time = customer_data.get("last_call_time", "")
+            last_sent = customer_data.get("last_sentiment", "Neutral")
+            last_intent = customer_data.get("last_intent", "สอบถามข้อมูลทั่วไป")
+            last_summary = customer_data.get("last_summary", "")
+            
+            history = customer_data.get("history", [])
+            total_calls += len(history) if history else c_calls
+            
+            for h in history:
+                sent = h.get("sentiment", "Neutral")
+                if sent in sentiment_counts:
+                    sentiment_counts[sent] += 1
+                else:
+                    sentiment_counts["Neutral"] += 1
+                    
+                intent = h.get("primary_intent", "สอบถามข้อมูลทั่วไป")
+                intent_counts[intent] = intent_counts.get(intent, 0) + 1
+
+            customer_list.append({
+                "phone": phone,
+                "caller_name": cust_name,
+                "total_calls": c_calls,
+                "last_call_time": last_time,
+                "last_sentiment": last_sent,
+                "last_intent": last_intent,
+                "last_summary": last_summary,
+                "history_count": len(history)
+            })
+
+        grand_total = max(1, sum(sentiment_counts.values()))
+        sentiment_percentages = {
+            k: round((v / grand_total) * 100, 1) for k, v in sentiment_counts.items()
+        }
+
+        return {
+            "status": "success",
+            "data": {
+                "total_calls": sum(sentiment_counts.values()),
+                "sentiment_counts": sentiment_counts,
+                "sentiment_percentages": sentiment_percentages,
+                "intent_counts": intent_counts,
+                "customers": customer_list
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error serving analytics API: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/transcripts/{phone}")
+async def get_customer_transcripts_api(phone: str):
+    try:
+        try:
+            with open("data/call_logs.json", "r", encoding="utf-8") as f:
+                logs = json.load(f)
+        except Exception:
+            logs = {}
+
+        if phone not in logs:
+            return JSONResponse({"status": "error", "message": "Customer phone not found"}, status_code=404)
+
+        return {"status": "success", "data": logs[phone]}
+    except Exception as e:
+        logger.error(f"Error retrieving transcripts for {phone}: {e}")
+        return {"status": "error", "message": str(e)}
+
 @app.get("/api/recordings/{filename}")
 async def get_recording_api(filename: str):
     filepath = os.path.join("recordings", filename)
@@ -62,26 +313,45 @@ async def get_recording_api(filename: str):
 import urllib.request
 import urllib.error
 
-def generate_conversation_summary(transcript_list: list) -> str:
+def analyze_call_intelligence(transcript_list: list) -> dict:
     """
-    Generates a summary of the conversation using Gemini 1.5 Flash REST API.
+    Analyzes the conversation transcript using Gemini REST API to extract:
+    - summary: 1-2 sentence overview
+    - sentiment: "Positive" | "Neutral" | "Negative"
+    - sentiment_score: float 0.0 to 1.0
+    - sentiment_reason: short explanation
+    - primary_intent: main customer intent category
     """
+    default_res = {
+        "summary": "ลูกค้าสนทนากับระบบผู้ช่วยเสียง",
+        "sentiment": "Neutral",
+        "sentiment_score": 0.5,
+        "sentiment_reason": "บทสนทนาทั่วไป",
+        "primary_intent": "สอบถามข้อมูลทั่วไป"
+    }
+
     if not transcript_list:
-        return "ไม่มีบันทึกการสนทนา"
-        
-    # Format transcript for prompt
+        return default_res
+
     formatted_transcript = ""
     for turn in transcript_list:
         role = "ลูกค้า (User)" if turn.get("role") == "user" else "ผู้ช่วย AI (Gemini)"
         text = turn.get("text", "")
         formatted_transcript += f"{role}: {text}\n"
-        
-    prompt = (
-        "ต่อไปนี้คือบทสนทนาระหว่างลูกค้าและผู้ช่วย AI ทางโทรศัพท์ของร้าน DripAI Coffee & Space "
-        "โปรดสรุปความต้องการของลูกค้าและข้อสรุปการสนทนาสั้นๆ กระชับ เป็นภาษาไทย (ความยาวไม่เกิน 1-2 ประโยค):\n\n"
-        f"{formatted_transcript}"
-    )
-    
+
+    prompt = f"""ต่อไปนี้คือบทสนทนาระหว่างลูกค้าและผู้ช่วย AI ทางโทรศัพท์ของร้าน DripAI Coffee & Space:
+
+{formatted_transcript}
+
+โปรดวิเคราะห์บทสนทนานี้และตอบกลับเป็น JSON เท่านั้นในรูปแบบต่อไปนี้ (ห้ามมี Markdown หรือข้อความอื่น):
+{{
+  "summary": "สรุปความต้องการของลูกค้าและข้อสรุปการสนทนา 1-2 ประโยค",
+  "sentiment": "Positive" | "Neutral" | "Negative",
+  "sentiment_score": 0.95,
+  "sentiment_reason": "เหตุผลสั้นๆ สำหรับอารมณ์ของลูกค้า",
+  "primary_intent": "เลือกหมวดหมู่อย่างใดอย่างหนึ่งจาก: 'สอบถามโปรโมชั่น', 'จองโต๊ะ', 'สอบถามสถานที่และเวลา', 'สอบถามเมนู', 'สมัคร/เช็กแต้มสมาชิก', 'อื่นๆ'"
+}}"""
+
     try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={config.GEMINI_API_KEY}"
         req_data = {
@@ -91,7 +361,10 @@ def generate_conversation_summary(transcript_list: list) -> str:
                         {"text": prompt}
                     ]
                 }
-            ]
+            ],
+            "generationConfig": {
+                "responseMimeType": "application/json"
+            }
         }
         req_body = json.dumps(req_data).encode("utf-8")
         req = urllib.request.Request(
@@ -99,22 +372,45 @@ def generate_conversation_summary(transcript_list: list) -> str:
             data=req_body,
             headers={"Content-Type": "application/json"}
         )
-        with urllib.request.urlopen(req, timeout=8) as response:
+        with urllib.request.urlopen(req, timeout=10) as response:
             res_data = json.loads(response.read().decode("utf-8"))
             candidates = res_data.get("candidates", [])
             if candidates:
                 content = candidates[0].get("content", {})
                 parts = content.get("parts", [])
                 if parts:
-                    summary_text = parts[0].get("text", "").strip()
-                    if summary_text:
-                        return summary_text
+                    raw_text = parts[0].get("text", "").strip()
+                    if raw_text:
+                        parsed = json.loads(raw_text)
+                        return {
+                            "summary": parsed.get("summary", default_res["summary"]),
+                            "sentiment": parsed.get("sentiment", default_res["sentiment"]),
+                            "sentiment_score": float(parsed.get("sentiment_score", 0.5)),
+                            "sentiment_reason": parsed.get("sentiment_reason", default_res["sentiment_reason"]),
+                            "primary_intent": parsed.get("primary_intent", default_res["primary_intent"])
+                        }
     except Exception as e:
-        logger.error(f"Error generating transcript summary: {e}")
-        
-    return "ลูกค้าสนทนากับระบบผู้ช่วยเสียง"
+        logger.error(f"Error analyzing call intelligence: {e}")
 
-def save_call_log(phone: str, caller_name: str, summary: str = None, recording_file: str = None, duration_sec: float = 0.0, transcript: list = None, tools_called: list = None):
+    return default_res
+
+def generate_conversation_summary(transcript_list: list) -> str:
+    res = analyze_call_intelligence(transcript_list)
+    return res.get("summary", "ลูกค้าสนทนากับระบบผู้ช่วยเสียง")
+
+def save_call_log(
+    phone: str,
+    caller_name: str,
+    summary: str = None,
+    recording_file: str = None,
+    duration_sec: float = 0.0,
+    transcript: list = None,
+    tools_called: list = None,
+    sentiment: str = "Neutral",
+    sentiment_score: float = 0.5,
+    sentiment_reason: str = "บทสนทนาทั่วไป",
+    primary_intent: str = "สอบถามข้อมูลทั่วไป"
+):
     try:
         try:
             with open("data/call_logs.json", "r", encoding="utf-8") as f:
@@ -130,6 +426,8 @@ def save_call_log(phone: str, caller_name: str, summary: str = None, recording_f
                 "total_calls": 0,
                 "last_call_time": "",
                 "last_summary": "ลูกค้าโทรเข้ามาสนทนากับระบบ Voice Agent",
+                "last_sentiment": sentiment,
+                "last_intent": primary_intent,
                 "recording_file": None,
                 "history": []
             }
@@ -138,24 +436,31 @@ def save_call_log(phone: str, caller_name: str, summary: str = None, recording_f
         logs[phone_key]["caller_name"] = caller_name or logs[phone_key]["caller_name"]
         logs[phone_key]["total_calls"] += 1
         logs[phone_key]["last_call_time"] = now_str
-        if summary:
-            logs[phone_key]["last_summary"] = summary
+        logs[phone_key]["last_summary"] = summary or logs[phone_key]["last_summary"]
+        logs[phone_key]["last_sentiment"] = sentiment
+        logs[phone_key]["last_intent"] = primary_intent
         if recording_file:
             logs[phone_key]["recording_file"] = recording_file
 
+        call_id = f"call_{phone_key}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
         logs[phone_key]["history"].append({
+            "call_id": call_id,
             "timestamp": now_str,
-            "topic": "บันทึกการโทรสนทนาโต้ตอบสด",
+            "topic": primary_intent or "บันทึกการโทรสนทนาโต้ตอบสด",
             "recording_file": recording_file,
             "duration_sec": round(duration_sec, 1),
             "summary": summary or "ลูกค้าเข้าชมระบบและสนทนากับระบบผู้ช่วยเสียง",
+            "sentiment": sentiment,
+            "sentiment_score": sentiment_score,
+            "sentiment_reason": sentiment_reason,
+            "primary_intent": primary_intent,
             "transcript": transcript or [],
             "tools_called": tools_called or []
         })
 
         with open("data/call_logs.json", "w", encoding="utf-8") as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved call log, summary & transcript for {phone_key}: {recording_file}")
+        logger.info(f"Saved call log, sentiment ({sentiment}), intent ({primary_intent}) & transcript for {phone_key}")
     except Exception as e:
         logger.error(f"Error saving call log: {e}")
 
@@ -368,19 +673,29 @@ async def handle_media_stream(twilio_ws: WebSocket):
                             if "inputTranscription" in server_content:
                                 transcript = server_content["inputTranscription"].get("text", "").strip()
                                 if transcript:
-                                    transcript_history.append({
-                                        "role": "user",
-                                        "text": transcript,
-                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
-                                    })
+                                    if transcript_history and transcript_history[-1]["role"] == "user":
+                                        prev_text = transcript_history[-1]["text"]
+                                        needs_space = bool(re.search(r'\w$', prev_text) and re.search(r'^\w', transcript))
+                                        transcript_history[-1]["text"] = prev_text + (" " if needs_space else "") + transcript
+                                    else:
+                                        transcript_history.append({
+                                            "role": "user",
+                                            "text": transcript,
+                                            "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                        })
                             if "outputTranscription" in server_content:
                                 transcript = server_content["outputTranscription"].get("text", "").strip()
                                 if transcript:
-                                    transcript_history.append({
-                                        "role": "model",
-                                        "text": transcript,
-                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
-                                    })
+                                    if transcript_history and transcript_history[-1]["role"] == "model":
+                                        prev_text = transcript_history[-1]["text"]
+                                        needs_space = bool(re.search(r'\w$', prev_text) and re.search(r'^\w', transcript))
+                                        transcript_history[-1]["text"] = prev_text + (" " if needs_space else "") + transcript
+                                    else:
+                                        transcript_history.append({
+                                            "role": "model",
+                                            "text": transcript,
+                                            "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                        })
 
                             # Check for Barge-in (Interruption)
                             if server_content.get("interrupted"):
@@ -708,6 +1023,13 @@ async def handle_local_stream(client_ws: WebSocket):
                         elif event == "audio":
                             pcm_b64 = message.get("data")
                             if pcm_b64:
+                                now_pc = time.perf_counter()
+                                if not session.get("raw_mic_audio_start_time"):
+                                    session["raw_mic_audio_start_time"] = now_pc
+                                    t_now = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                                    print(f"\n🎙️ [MIC AUDIO ARRIVED {t_now}] Raw microphone audio stream started arriving at server", flush=True)
+                                session["raw_mic_audio_last_time"] = now_pc
+
                                 if session.get("client_speaking", True):
                                     gemini_msg = {
                                         "realtimeInput": {
@@ -808,11 +1130,31 @@ async def handle_local_stream(client_ws: WebSocket):
                             if "inputTranscription" in server_content:
                                 transcript = server_content["inputTranscription"].get("text", "").strip()
                                 if transcript:
-                                    transcript_history.append({
-                                        "role": "user",
-                                        "text": transcript,
-                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
-                                    })
+                                    now_pc = time.perf_counter()
+                                    session["last_speech_time"] = now_pc
+                                    if not session.get("turn_speech_start_time"):
+                                        session["turn_speech_start_time"] = now_pc
+                                    
+                                    t_now = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                                    mic_start_t = session.get("raw_mic_audio_start_time") or now_pc
+                                    stt_lag_ms = (now_pc - mic_start_t) * 1000
+                                    
+                                    if not session.get("first_stt_text_time"):
+                                        session["first_stt_text_time"] = now_pc
+                                        print(f"[TIMING {t_now}] GEMINI STT FIRST TEXT: '{transcript}' (Raw Audio Arrived -> Text Output Latency: {stt_lag_ms:.0f} ms / {stt_lag_ms/1000:.2f}s)", flush=True)
+                                    else:
+                                        print(f"[TIMING {t_now}] GEMINI STT TEXT FRAGMENT: '{transcript}' (Lag since audio start: {stt_lag_ms/1000:.2f}s)", flush=True)
+
+                                    if transcript_history and transcript_history[-1]["role"] == "user":
+                                        prev_text = transcript_history[-1]["text"]
+                                        needs_space = bool(re.search(r'\w$', prev_text) and re.search(r'^\w', transcript))
+                                        transcript_history[-1]["text"] = prev_text + (" " if needs_space else "") + transcript
+                                    else:
+                                        transcript_history.append({
+                                            "role": "user",
+                                            "text": transcript,
+                                            "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                        })
                                     try:
                                         await client_ws.send_json({
                                             "event": "user_transcript",
@@ -824,11 +1166,30 @@ async def handle_local_stream(client_ws: WebSocket):
                             if "outputTranscription" in server_content:
                                 transcript = server_content["outputTranscription"].get("text", "").strip()
                                 if transcript:
-                                    transcript_history.append({
-                                        "role": "model",
-                                        "text": transcript,
-                                        "time": datetime.datetime.now().strftime("%H:%M:%S")
-                                    })
+                                    now_pc = time.perf_counter()
+                                    t_now = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                                    if not session.get("turn_first_ai_text_time"):
+                                        session["turn_first_ai_text_time"] = now_pc
+                                        last_sp = session.get("last_speech_time") or now_pc
+                                        turn_sp = session.get("turn_speech_start_time") or last_sp
+                                        sil_ms = (now_pc - last_sp) * 1000
+                                        tot_ms = (now_pc - turn_sp) * 1000
+                                        print(f"\n[TIMING {t_now}] AI FIRST TEXT FRAGMENT: '{transcript}'", flush=True)
+                                        print(f"  └─► Silence-to-Text Latency: {sil_ms:.0f} ms ({sil_ms/1000:.2f}s)", flush=True)
+                                        print(f"  └─► Total Turn Time: {tot_ms:.0f} ms ({tot_ms/1000:.2f}s)", flush=True)
+                                    else:
+                                        print(f"[TIMING {t_now}] AI Text Fragment: '{transcript}'", flush=True)
+
+                                    if transcript_history and transcript_history[-1]["role"] == "model":
+                                        prev_text = transcript_history[-1]["text"]
+                                        needs_space = bool(re.search(r'\w$', prev_text) and re.search(r'^\w', transcript))
+                                        transcript_history[-1]["text"] = prev_text + (" " if needs_space else "") + transcript
+                                    else:
+                                        transcript_history.append({
+                                            "role": "model",
+                                            "text": transcript,
+                                            "time": datetime.datetime.now().strftime("%H:%M:%S")
+                                        })
                                     try:
                                         await client_ws.send_json({
                                             "event": "ai_transcript",
@@ -867,8 +1228,30 @@ async def handle_local_stream(client_ws: WebSocket):
                                 except Exception:
                                     pass
 
+                                if session.get("pending_end_call"):
+                                    logger.info(f"[TURN {session['turn_id']}] END_CALL pending -> scheduling hangup in 2.5s after turn complete")
+                                    session["pending_end_call"] = False
+                                    async def delayed_hangup():
+                                        await asyncio.sleep(2.5)
+                                        try:
+                                            await client_ws.send_json({"event": "end_call"})
+                                        except Exception:
+                                            pass
+                                        await asyncio.sleep(0.6)
+                                        try:
+                                            await client_ws.close()
+                                        except Exception:
+                                            pass
+                                    asyncio.create_task(delayed_hangup())
+
                                 session["turn_active"] = False
                                 session["client_speaking"] = True  # Start listening again
+                                session["turn_first_ai_text_time"] = None
+                                session["turn_first_ai_audio_time"] = None
+                                session["turn_speech_start_time"] = None
+                                session["raw_mic_audio_start_time"] = None
+                                session["raw_mic_audio_last_time"] = None
+                                session["first_stt_text_time"] = None
 
                                 if session.get("pending_end_call"):
                                     logger.info(f"[TURN {session['turn_id']}] END_CALL pending -> scheduling hangup in 3.5s after turn complete")
@@ -921,6 +1304,20 @@ async def handle_local_stream(client_ws: WebSocket):
                                     if inline_data and inline_data.get("mimeType", "").startswith("audio/pcm"):
                                         pcm_24k_b64 = inline_data.get("data")
 
+                                        if not session.get("turn_first_ai_audio_time"):
+                                            session["turn_first_ai_audio_time"] = time.perf_counter()
+                                            now_pc = time.perf_counter()
+                                            t_now = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                                            last_sp = session.get("last_speech_time") or now_pc
+                                            turn_sp = session.get("turn_speech_start_time") or last_sp
+                                            sil_ms = (now_pc - last_sp) * 1000
+                                            tot_ms = (now_pc - turn_sp) * 1000
+                                            print(f"\n" + "="*75, flush=True)
+                                            print(f"🚀 [TIMING {t_now}] 🔊 FIRST AI AUDIO PCM PACKET SENT TO BROWSER!", flush=True)
+                                            print(f"   ⏱️ Silence-to-Audio Latency (User stopped speech -> AI speaks): {sil_ms:.0f} ms ({sil_ms/1000:.2f}s)", flush=True)
+                                            print(f"   ⏱️ Total Turn Time (First user word -> AI speaks): {tot_ms:.0f} ms ({tot_ms/1000:.2f}s)", flush=True)
+                                            print(f"="*75 + "\n", flush=True)
+
                                         if (
                                             session["turn_active"]
                                             and session["gemini_audio_ms"] is None
@@ -964,6 +1361,8 @@ async def handle_local_stream(client_ws: WebSocket):
                                 fn_name = fc.get("name")
                                 call_id = fc.get("id")
                                 args = fc.get("args", {})
+                                t_now = datetime.datetime.now().strftime("%H:%M:%S.%f")[:-3]
+                                print(f"\n[TIMING {t_now}] 🛠️ TOOL CALL INVOKED BY GEMINI: '{fn_name}' args={args}", flush=True)
                                 logger.info(f"[TURN {session['turn_id']}] TOOL_CALL fn={fn_name} id={call_id}")
                                 if fn_name not in tools_called:
                                     tools_called.append(fn_name)
@@ -1157,16 +1556,21 @@ async def handle_local_stream(client_ws: WebSocket):
         logger.info("Cleaning up local connections...")
         duration_sec = time.time() - start_time
         rec_file = recorder.save()
+        # Save transcript and summary to logs
         if transcript_history:
-            summary = generate_conversation_summary(transcript_history)
+            intel = analyze_call_intelligence(transcript_history)
             save_call_log(
                 phone=recorder.phone,
                 caller_name=recorder.caller_name,
-                summary=summary,
+                summary=intel.get("summary"),
                 recording_file=rec_file,
                 duration_sec=duration_sec,
                 transcript=transcript_history,
-                tools_called=tools_called
+                tools_called=tools_called,
+                sentiment=intel.get("sentiment", "Neutral"),
+                sentiment_score=intel.get("sentiment_score", 0.5),
+                sentiment_reason=intel.get("sentiment_reason", "บทสนทนาทั่วไป"),
+                primary_intent=intel.get("primary_intent", "สอบถามข้อมูลทั่วไป")
             )
         try:
             await client_ws.close()

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice Agent Dashboard | Sandbox</title>
+    <title>APEX AGENT | Platform Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -1108,7 +1108,7 @@
                     <line x1="12" y1="19" y2="22"/>
                 </svg>
             </div>
-            <div class="logo-text">Voice Agent Sandbox</div>
+            <div class="logo-text">APEX AGENT</div>
         </div>
 
         <a href="#" class="back-link">
@@ -1118,7 +1118,7 @@
         <!-- Outbound Assistant Controller Box -->
         <div class="assistant-box">
             <div class="assistant-profile">
-                <div class="assistant-avatar">DA</div>
+                <div class="assistant-avatar">AA</div>
                 <div class="assistant-details">
                     <h4 id="assistant-name-display">{{COMPANY_NAME}}</h4>
                     <p>ID: 23569842 (Outbound)</p>
@@ -1310,8 +1310,55 @@
                 </div>
             </div>
 
-            <!-- 2. TAB: CONFIGURE (RAG ADMIN) -->
+            <!-- 2. TAB: CONFIGURE (RAG ADMIN & DYNAMIC KNOWLEDGE) -->
             <div class="tab-content" id="tab-configure">
+
+                <!-- DYNAMIC KNOWLEDGE MANAGEMENT FILE UPLOAD -->
+                <div class="table-card" style="margin-bottom: 24px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                        <div>
+                            <h3 style="font-size:16px; font-weight:800; display: flex; align-items: center; gap: 8px; color: var(--primary-color);">
+                                📁 Dynamic Knowledge Management (PDF / CSV / TXT Upload)
+                            </h3>
+                            <p style="font-size:12px; color:var(--text-muted); margin-top:3px;">ลากและวางไฟล์เอกสาร PDF เมนูอาหาร, ไฟล์ CSV สินค้า หรือไฟล์ TXT ข้อมูลร้านค้า เพื่อให้ AI ตัด Chunk และสร้าง Vector Embeddings ลง ChromaDB ทันที</p>
+                        </div>
+                        <span id="doc-upload-status" class="status-pill success" style="display: none; padding: 6px 14px;">✓ อัปโหลดและซิงค์ Vector Store สำเร็จ!</span>
+                    </div>
+
+                    <!-- Drag & Drop Dropzone -->
+                    <div id="dropzone-box" style="border: 2px dashed #a5b4fc; background: #f8fafc; border-radius: 16px; padding: 32px; text-align: center; cursor: pointer; transition: all 0.2s ease; margin-bottom: 20px;">
+                        <input type="file" id="doc-file-input" accept=".pdf,.csv,.txt" style="display: none;" />
+                        <div style="font-size: 36px; margin-bottom: 8px;">📑</div>
+                        <div style="font-weight: 700; font-size: 15px; color: var(--text-color);">คลิกเพื่อเลือกไฟล์ หรือ ลากไฟล์ PDF, CSV, TXT มาวางที่นี่</div>
+                        <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">รองรับไฟล์เอกสาร PDF, CSV และ TXT (ระบบจะหั่น Chunk และสร้าง Vector Index อัตโนมัติ)</div>
+                    </div>
+
+                    <!-- Uploaded Documents List Table -->
+                    <div>
+                        <h4 style="font-size:13.5px; font-weight:700; color:var(--text-color); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
+                            📚 เอกสารความรู้ที่ลงทะเบียนในระบบ Vector Store (Uploaded Knowledge Documents)
+                        </h4>
+                        <div style="overflow-x: auto;">
+                            <table class="data-table" style="width:100%;">
+                                <thead>
+                                    <tr>
+                                        <th>ชื่อไฟล์เอกสาร</th>
+                                        <th>ประเภท</th>
+                                        <th>จำนวน Vector Chunks</th>
+                                        <th>วันที่อัปโหลด</th>
+                                        <th>จัดการ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="documents-tbody">
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: var(--text-muted);">ยังไม่มีเอกสารอัปโหลดในระบบ</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="table-card">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 16px;">
                         <div>
@@ -2044,7 +2091,8 @@
         }
 
         function endPhoneCall() {
-            closePhoneModal();
+            const modal = document.getElementById('phone-modal-overlay');
+            if (modal) modal.classList.remove('active');
             stopCallTimer();
             const dock = document.getElementById('floating-call-dock');
             if (dock) dock.classList.remove('active');
@@ -2052,9 +2100,7 @@
             const avatarCircle = document.getElementById('caller-avatar-circle');
             if (avatarCircle) avatarCircle.classList.remove('speaking');
 
-            if (isConnected) {
-                disconnect();
-            }
+            disconnect();
             log('📞 วางสายโทรศัพท์เรียบร้อยแล้ว', 'system');
         }
 
@@ -2808,6 +2854,8 @@
         let activeBotMsgDiv = null;
         let activeBotConsoleLine = null;
         let activeBotTranscript = "";
+        let activeUserConsoleLine = null;
+        let activeUserTranscript = "";
 
         drawWave();
 
@@ -2897,7 +2945,8 @@
                 audio: { 
                     channelCount: 1, 
                     echoCancellation: true, 
-                    noiseSuppression: true 
+                    noiseSuppression: true,
+                    autoGainControl: true
                 } 
             })
             .then(stream => {
@@ -2944,8 +2993,8 @@
                     // Start Call Timer
                     startCallTimer();
 
-                    // Setup Recording script processing node (512 buffer size)
-                    scriptNode = audioContext.createScriptProcessor(512, 1, 1);
+                    // Setup Recording script processing node (4096 buffer size = ~85ms chunks)
+                    scriptNode = audioContext.createScriptProcessor(4096, 1, 1);
                     source.connect(scriptNode);
                     scriptNode.connect(audioContext.destination);
                     
@@ -2955,6 +3004,16 @@
                         const inputBuffer = audioProcessingEvent.inputBuffer;
                         const inputData = inputBuffer.getChannelData(0);
                         
+                        // Prevent speaker echo bleed from falsely triggering Barge-In while AI is speaking
+                        if (isReceivingAudio) {
+                            let sum = 0;
+                            for (let i = 0; i < inputData.length; i++) {
+                                sum += inputData[i] * inputData[i];
+                            }
+                            const rms = Math.sqrt(sum / inputData.length);
+                            if (rms < 0.045) return;
+                        }
+
                         // Downsample 48kHz (browser default) to 16kHz PCM (Gemini expectation)
                         const downsampled = downsampleBuffer(inputData, audioContext.sampleRate, 16000);
                         const pcm16 = floatTo16BitPCM(downsampled);
@@ -3005,9 +3064,10 @@
 
                         if (!activeUserMsgDiv) {
                             // Create new user bubble
+                            activeUserTranscript = text;
                             activeUserMsgDiv = document.createElement('div');
                             activeUserMsgDiv.className = 'chat-msg user';
-                            activeUserMsgDiv.textContent = text;
+                            activeUserMsgDiv.textContent = activeUserTranscript;
                             
                             // Remove placeholder system message if any
                             const placeholder = chatMessages.querySelector('.chat-msg.system');
@@ -3017,20 +3077,40 @@
                             
                             chatMessages.appendChild(activeUserMsgDiv);
                         } else {
-                            activeUserMsgDiv.textContent = text;
+                            const needsSpace = /\w$/.test(activeUserTranscript) && /^\w/.test(text);
+                            activeUserTranscript = activeUserTranscript + (needsSpace ? ' ' : '') + text;
+                            activeUserMsgDiv.textContent = activeUserTranscript;
                         }
                         chatMessages.scrollTop = chatMessages.scrollHeight;
 
                         // Update simulator phone preview
                         const phonePreview = document.getElementById('phone-chat-preview');
                         if (phonePreview) {
-                            phonePreview.textContent = '🎤 ลูกค้า: ' + text;
+                            phonePreview.textContent = '🎤 ลูกค้า: ' + activeUserTranscript;
                         }
 
-                        log(`[USER SPEECH] ${text}`, 'user');
+                        // Update Live Console (IN-PLACE consolidation)
+                        if (!activeUserConsoleLine) {
+                            activeUserConsoleLine = document.createElement('div');
+                            activeUserConsoleLine.className = 'console-line console-user';
+                            const time = new Date().toLocaleTimeString();
+                            activeUserConsoleLine.innerHTML = `
+                                <span class="console-time">[${time}]</span>
+                                <span class="console-message">${escapeHtml('[USER SPEECH] ' + activeUserTranscript)}</span>
+                            `;
+                            consoleEl.appendChild(activeUserConsoleLine);
+                        } else {
+                            const msgSpan = activeUserConsoleLine.querySelector('.console-message');
+                            if (msgSpan) {
+                                msgSpan.textContent = '[USER SPEECH] ' + activeUserTranscript;
+                            }
+                        }
+                        consoleEl.scrollTop = consoleEl.scrollHeight;
                     }
                     else if (msg.event === 'ai_transcript') {
                         activeUserMsgDiv = null; // Reset user bubble
+                        activeUserConsoleLine = null; // Reset user console line
+                        activeUserTranscript = ""; // Reset user transcript
                         const text = msg.text.trim();
                         if (!text) return;
 
@@ -3096,6 +3176,8 @@
                         activeUserMsgDiv = null;
                         activeBotConsoleLine = null; // Reset bot console line
                         activeBotTranscript = ""; // Reset bot transcript
+                        activeUserConsoleLine = null; // Reset user console line
+                        activeUserTranscript = ""; // Reset user transcript
                         log('🏁 Turn Complete.', 'system');
                     }
                     else if (msg.event === 'status') {
@@ -3109,6 +3191,8 @@
                         activeUserMsgDiv = null;
                         activeBotConsoleLine = null; // Reset bot console line
                         activeBotTranscript = ""; // Reset bot transcript
+                        activeUserConsoleLine = null; // Reset user console line
+                        activeUserTranscript = ""; // Reset user transcript
                         
                         // Clear visual speech badge
                         if (speakingBadge) speakingBadge.style.display = 'inline-block';
@@ -3136,6 +3220,18 @@
                     }
                     else if (msg.event === 'tool-response') {
                         log(`[TOOL RESPONSE] Result: ${JSON.stringify(msg.response)}`, 'tool');
+                    }
+                    else if (msg.event === 'end_call') {
+                        log('📞 สิ้นสุดการสนทนา (End Call): AI วางสายและบันทึกประวัติการโทรเรียบร้อยแล้ว', 'system');
+                        endPhoneCall();
+                        setTimeout(() => {
+                            if (typeof loadCustomerHistory === 'function') {
+                                loadCustomerHistory();
+                            }
+                            if (typeof loadDashboardStats === 'function') {
+                                loadDashboardStats();
+                            }
+                        }, 1000);
                     }
                 };
 
@@ -3474,9 +3570,129 @@
             });
         }
 
+        let breakdownChartInstance = null;
+        let analysisChartInstance = null;
+
+        async function loadAnalyticsDashboard() {
+            try {
+                const res = await fetch('/api/analytics/sentiment-intent');
+                const json = await res.json();
+                if (json.status !== 'success') return;
+                const data = json.data;
+
+                // 1. Update Metrics Cards
+                const totalCallsEl = document.getElementById('stat-total-calls');
+                if (totalCallsEl) totalCallsEl.textContent = data.total_calls || 0;
+
+                const totalActionsEl = document.getElementById('stat-total-actions');
+                if (totalActionsEl) {
+                    const posPct = data.sentiment_percentages?.Positive || 0;
+                    totalActionsEl.textContent = `${posPct}% Positive`;
+                }
+
+                // 2. Render Donut Chart (Sentiment Breakdown)
+                const ctxBreakdown = document.getElementById('callBreakdownChart');
+                if (ctxBreakdown) {
+                    if (breakdownChartInstance) breakdownChartInstance.destroy();
+                    const sentCounts = data.sentiment_counts || { Positive: 0, Neutral: 0, Negative: 0 };
+                    breakdownChartInstance = new Chart(ctxBreakdown, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Positive (พึงพอใจ)', 'Neutral (ปานกลาง)', 'Negative (ไม่พอใจ)'],
+                            datasets: [{
+                                data: [sentCounts.Positive || 0, sentCounts.Neutral || 0, sentCounts.Negative || 0],
+                                backgroundColor: ['#10b981', '#6366f1', '#ef4444'],
+                                borderWidth: 2,
+                                borderColor: '#ffffff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { font: { family: 'Noto Sans Thai, sans-serif', size: 11 } } }
+                            }
+                        }
+                    });
+                }
+
+                // 3. Render Intent Bar Chart
+                const ctxAnalysis = document.getElementById('callAnalysisChart');
+                if (ctxAnalysis) {
+                    if (analysisChartInstance) analysisChartInstance.destroy();
+                    const intentCounts = data.intent_counts || {};
+                    const labels = Object.keys(intentCounts);
+                    const values = Object.values(intentCounts);
+
+                    analysisChartInstance = new Chart(ctxAnalysis, {
+                        type: 'bar',
+                        data: {
+                            labels: labels.length > 0 ? labels : ['ไม่มีข้อมูล'],
+                            datasets: [{
+                                label: 'จำนวนสายสนทนาตามเป้าหมาย (Intent)',
+                                data: values.length > 0 ? values : [0],
+                                backgroundColor: '#6366f1',
+                                borderRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                            }
+                        }
+                    });
+                }
+
+                // 4. Update Recent Conversations Table in Dashboard
+                const callsTbody = document.getElementById('dashboard-calls-tbody');
+                if (callsTbody && data.customers) {
+                    callsTbody.innerHTML = '';
+                    if (data.customers.length === 0) {
+                        callsTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">ไม่มีประวัติการโทรสนทนา</td></tr>';
+                    } else {
+                        data.customers.forEach(cust => {
+                            const tr = document.createElement('tr');
+                            const sentColor = cust.last_sentiment === 'Positive' ? '#10b981' : (cust.last_sentiment === 'Negative' ? '#ef4444' : '#64748b');
+                            const sentBg = cust.last_sentiment === 'Positive' ? '#d1fae5' : (cust.last_sentiment === 'Negative' ? '#fee2e2' : '#f1f5f9');
+                            
+                            tr.innerHTML = `
+                                <td>
+                                    <strong style="color:var(--text-color); font-size:13px;">${escapeHtml(cust.caller_name)}</strong>
+                                    <div style="font-size:11px; color:var(--text-muted);">📞 ${escapeHtml(cust.phone)}</div>
+                                </td>
+                                <td>
+                                    <span style="background:${sentBg}; color:${sentColor}; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px;">
+                                        ${cust.last_sentiment === 'Positive' ? '🟢 Positive' : (cust.last_sentiment === 'Negative' ? '🔴 Negative' : '⚪ Neutral')}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span style="background:#e0e7ff; color:#4f46e5; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px;">
+                                        🎯 ${escapeHtml(cust.last_intent)}
+                                    </span>
+                                </td>
+                                <td style="font-size:12px; color:var(--text-muted); max-width:240px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
+                                    ${escapeHtml(cust.last_summary)}
+                                </td>
+                            `;
+                            callsTbody.appendChild(tr);
+                        });
+                    }
+                }
+            } catch (err) {
+                console.error('Error loading analytics dashboard:', err);
+            }
+        }
+
         // Load Customer Logs and Playback History
         async function loadCustomerHistory() {
             try {
+                loadAnalyticsDashboard();
+
                 const logsRes = await fetch('/api/call-logs');
                 const logsJson = await logsRes.json();
                 const logsContainer = document.getElementById('customer-logs-list');
@@ -3501,6 +3717,9 @@
                                     recording_file: call.recording_file,
                                     duration_sec: call.duration_sec,
                                     summary: call.summary || client.last_summary || 'สนทนากับผู้ช่วยเสียง',
+                                    sentiment: call.sentiment || client.last_sentiment || 'Neutral',
+                                    sentiment_reason: call.sentiment_reason || 'บทสนทนาทั่วไป',
+                                    primary_intent: call.primary_intent || client.last_intent || 'สอบถามข้อมูลทั่วไป',
                                     transcript: call.transcript || []
                                 });
                             });
@@ -3515,6 +3734,9 @@
                             card.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:14px; padding:16px; font-size:13px; box-shadow: var(--shadow-soft); display:flex; flex-direction:column; gap:10px; margin-bottom: 12px;';
                             
                             const durText = call.duration_sec ? `${Math.ceil(call.duration_sec)} วินาที` : 'ไม่ระบุ';
+                            const sentBg = call.sentiment === 'Positive' ? '#d1fae5' : (call.sentiment === 'Negative' ? '#fee2e2' : '#f1f5f9');
+                            const sentColor = call.sentiment === 'Positive' ? '#10b981' : (call.sentiment === 'Negative' ? '#ef4444' : '#64748b');
+
                             const audioPlayerHtml = call.recording_file ? `
                                 <div class="audio-recording-box" style="margin-top:4px;">
                                     <audio controls style="width:100%; height:32px; border-radius: 6px;" src="/api/recordings/${escapeHtml(call.recording_file)}"></audio>
@@ -3554,10 +3776,22 @@
                             card.innerHTML = `
                                 <div style="display:flex; justify-content:space-between; align-items:center;">
                                     <span style="font-weight:700; color:var(--text-color); font-size:14px;">👤 ${escapeHtml(call.caller_name)}</span>
-                                    <span style="font-size:11.5px; background:var(--primary-light); color:var(--primary-color); padding:2px 8px; border-radius:6px; font-weight:700;">⏱️ ${durText}</span>
+                                    <div style="display:flex; gap:6px; align-items:center;">
+                                        <span style="background:${sentBg}; color:${sentColor}; padding:2px 8px; border-radius:6px; font-weight:700; font-size:11px;">
+                                            ${call.sentiment === 'Positive' ? '🟢 Positive' : (call.sentiment === 'Negative' ? '🔴 Negative' : '⚪ Neutral')}
+                                        </span>
+                                        <span style="font-size:11.5px; background:var(--primary-light); color:var(--primary-color); padding:2px 8px; border-radius:6px; font-weight:700;">⏱️ ${durText}</span>
+                                    </div>
                                 </div>
-                                <div style="color:var(--text-muted); font-size:11px; font-weight:600;">📞 เบอร์: ${escapeHtml(call.phone)} | 📅 วันที่: ${escapeHtml(call.timestamp)}</div>
-                                <div style="background:#faf9fd; border:1px solid var(--border-color); border-radius:10px; padding:10px; color:var(--text-color); line-height:1.4; font-size:12.5px;"><strong>สรุปผล:</strong> ${escapeHtml(call.summary)}</div>
+                                <div style="color:var(--text-muted); font-size:11px; font-weight:600; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                                    <span>📞 เบอร์: ${escapeHtml(call.phone)}</span>
+                                    <span>🎯 Intent: <strong style="color:var(--primary-color);">${escapeHtml(call.primary_intent)}</strong></span>
+                                    <span>📅 ${escapeHtml(call.timestamp)}</span>
+                                </div>
+                                <div style="background:#faf9fd; border:1px solid var(--border-color); border-radius:10px; padding:10px; color:var(--text-color); line-height:1.4; font-size:12.5px;">
+                                    <strong>สรุปผล:</strong> ${escapeHtml(call.summary)}
+                                    <div style="font-size:11px; color:var(--text-muted); margin-top:4px;"><em>💡 วิเคราะห์อารมณ์: ${escapeHtml(call.sentiment_reason)}</em></div>
+                                </div>
                                 ${audioPlayerHtml}
                                 ${transcriptHtml}
                             `;
@@ -3599,6 +3833,148 @@
 
         // Trigger loading Knowledge details on page startup
         loadKnowledgeAdmin();
+
+        // Load Dynamic Documents Table
+        async function loadUploadedDocuments() {
+            try {
+                const res = await fetch('/api/knowledge/documents');
+                const json = await res.json();
+                const tbody = document.getElementById('documents-tbody');
+                if (!tbody || json.status !== 'success') return;
+
+                tbody.innerHTML = '';
+                const docs = json.data || [];
+                if (docs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">ยังไม่มีเอกสารอัปโหลดในระบบ (ลากไฟล์ PDF/CSV/TXT ด้านบนเพื่อเพิ่มข้อมูล)</td></tr>';
+                    return;
+                }
+
+                docs.forEach(doc => {
+                    const tr = document.createElement('tr');
+                    const typeBg = doc.source_type === 'pdf' ? '#fee2e2' : (doc.source_type === 'csv' ? '#d1fae5' : '#e0e7ff');
+                    const typeColor = doc.source_type === 'pdf' ? '#ef4444' : (doc.source_type === 'csv' ? '#10b981' : '#4f46e5');
+
+                    tr.innerHTML = `
+                        <td>
+                            <strong style="color:var(--text-color); font-size:13px;">📄 ${escapeHtml(doc.filename)}</strong>
+                        </td>
+                        <td>
+                            <span style="background:${typeBg}; color:${typeColor}; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; text-transform:uppercase;">
+                                ${doc.source_type}
+                            </span>
+                        </td>
+                        <td>
+                            <span style="background:var(--primary-light); color:var(--primary-color); padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px;">
+                                🧩 ${doc.chunk_count} Chunks
+                            </span>
+                        </td>
+                        <td style="font-size:12px; color:var(--text-muted);">
+                            ${escapeHtml(doc.uploaded_at)}
+                        </td>
+                        <td>
+                            <button class="btn btn-outline" style="padding:4px 10px; font-size:11px; color:#ef4444; border-color:#fca5a5;" onclick="deleteDocument('${doc.doc_id}')">
+                                🗑️ ลบเอกสาร
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                console.error('Failed to load uploaded documents:', err);
+            }
+        }
+
+        // Upload Document Function
+        async function uploadDocumentFile(file) {
+            if (!file) return;
+            const statusBadge = document.getElementById('doc-upload-status');
+            if (statusBadge) {
+                statusBadge.style.display = 'inline-block';
+                statusBadge.className = 'status-pill warning';
+                statusBadge.textContent = '⏳ กำลังสกัดข้อความและสร้าง Vector Index...';
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch('/api/knowledge/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    if (statusBadge) {
+                        statusBadge.className = 'status-pill success';
+                        statusBadge.textContent = `✓ ${json.message}`;
+                        setTimeout(() => { statusBadge.style.display = 'none'; }, 4000);
+                    }
+                    loadUploadedDocuments();
+                } else {
+                    alert('เกิดข้อผิดพลาดในการอัปโหลด: ' + json.message);
+                    if (statusBadge) statusBadge.style.display = 'none';
+                }
+            } catch (err) {
+                alert('ไม่สามารถอัปโหลดไฟล์ได้: ' + err);
+                if (statusBadge) statusBadge.style.display = 'none';
+            }
+        }
+
+        // Delete Document Function
+        async function deleteDocument(docId) {
+            if (!confirm('คุณต้องการลบเอกสารนี้ออกจาก Vector Store ใช่หรือไม่?')) return;
+            try {
+                const res = await fetch(`/api/knowledge/documents/${docId}`, { method: 'DELETE' });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    loadUploadedDocuments();
+                } else {
+                    alert('ไม่สามารถลบเอกสารได้: ' + json.message);
+                }
+            } catch (err) {
+                alert('เกิดข้อผิดพลาด: ' + err);
+            }
+        }
+
+        // Setup Dropzone Event Listeners
+        function initDropzone() {
+            const dropzone = document.getElementById('dropzone-box');
+            const fileInput = document.getElementById('doc-file-input');
+            if (!dropzone || !fileInput) return;
+
+            dropzone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    uploadDocumentFile(e.target.files[0]);
+                    fileInput.value = '';
+                }
+            });
+
+            dropzone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '#4f46e5';
+                dropzone.style.background = '#e0e7ff';
+            });
+
+            dropzone.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '#a5b4fc';
+                dropzone.style.background = '#f8fafc';
+            });
+
+            dropzone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropzone.style.borderColor = '#a5b4fc';
+                dropzone.style.background = '#f8fafc';
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    uploadDocumentFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        initDropzone();
+        loadUploadedDocuments();
 
         // Refresh History Button
         const refreshHistoryBtn = document.getElementById('refresh-history-btn');
