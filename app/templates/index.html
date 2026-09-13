@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APEX AGENT | Platform Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234f46e5'%3E%3Cpath d='M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z'/%3E%3Cpath d='M19 10v1a7 7 0 0 1-14 0v-1' stroke='%234f46e5' stroke-width='2' stroke-linecap='round' fill='none'/%3E%3Cline x1='12' y1='19' x2='12' y2='22' stroke='%234f46e5' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -99,6 +100,53 @@
 
         .back-link:hover {
             color: var(--primary-color);
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .spin-icon {
+            animation: spin 0.9s linear infinite;
+            transform-origin: center;
+        }
+        @keyframes pulseGlow {
+            0% { opacity: 0.88; border-color: rgba(99, 102, 241, 0.4); }
+            50% { opacity: 1; border-color: rgba(99, 102, 241, 1); }
+            100% { opacity: 0.88; border-color: rgba(99, 102, 241, 0.4); }
+        }
+        .history-call-card.new-entry {
+            animation: highlightNewCard 2.5s ease-out;
+        }
+        @keyframes highlightNewCard {
+            0% { transform: translateY(-6px); box-shadow: 0 0 0 2px #6366f1, 0 10px 25px rgba(99, 102, 241, 0.2); }
+            100% { transform: translateY(0); box-shadow: var(--shadow-soft); }
+        }
+
+        /* Customer Filter Pills */
+        .cust-pill {
+            padding: 4px 12px;
+            font-size: 11.5px;
+            font-weight: 600;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: #ffffff;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .cust-pill:hover {
+            border-color: var(--primary-color);
+            background: rgba(99, 102, 241, 0.05);
+        }
+        .cust-pill.active {
+            background: var(--primary-color);
+            color: #ffffff;
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 6px rgba(99, 102, 241, 0.3);
         }
 
         /* Outbound Assistant Info Box */
@@ -1111,10 +1159,6 @@
             <div class="logo-text">APEX AGENT</div>
         </div>
 
-        <a href="#" class="back-link">
-            <span>&lsaquo;</span> Back to Assistants
-        </a>
-
         <!-- Outbound Assistant Controller Box -->
         <div class="assistant-box">
             <div class="assistant-profile">
@@ -1141,38 +1185,38 @@
             <li class="nav-item active" data-tab-target="tab-dashboard">
                 <button>
                     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                    Dashboard
+                    <span data-i18n="nav_dashboard">Dashboard</span>
                 </button>
             </li>
             <li class="nav-item" data-tab-target="tab-configure">
                 <button>
-                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                    Configure (Admin)
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06-.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83-2.83l.06-.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <span data-i18n="nav_configure">Configure (Admin)</span>
                 </button>
             </li>
             <li class="nav-item" data-tab-target="tab-prompt">
                 <button>
                     <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                    Prompt (Knowledge)
+                    <span data-i18n="nav_prompt">Prompt (Knowledge)</span>
                 </button>
             </li>
             <li class="nav-item" data-tab-target="tab-history">
                 <button>
                     <svg viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                    Calls & Reservations
+                    <span data-i18n="nav_history">Calls & Reservations</span>
                 </button>
             </li>
             <li class="nav-item" data-tab-target="tab-sandbox">
                 <button>
                     <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"/><path d="M19 10v1a7 7 0 0 1-14 0v-1"/><line x1="12" y1="19" x2="12" y2="22"/></svg>
-                    Console Sandbox
+                    <span data-i18n="nav_sandbox">Console Sandbox</span>
                 </button>
             </li>
         </ul>
 
         <div class="sidebar-footer">
             <span>v1.0.0 Stable</span>
-            <span style="display: flex; align-items: center; gap: 6px;">
+            <span style="display: flex; align-items: center; gap: 6px; cursor: pointer; color: var(--text-muted); transition: var(--transition);" onclick="switchTab('tab-configure')" title="เปิดหน้าตั้งค่าระบบ (Admin)">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
                 Settings
             </span>
@@ -1183,15 +1227,26 @@
     <main class="workspace">
         <header class="topbar">
             <div class="topbar-title">
-                <h2 id="topbar-section-title">Dashboard Overview</h2>
+                <h2 id="topbar-section-title" data-i18n="topbar_title">Dashboard Overview</h2>
             </div>
             <div style="display: flex; align-items: center; gap: 10px;">
+                <!-- Language Switcher Dropdown -->
+                <div class="lang-dropdown-container" style="display: flex; align-items: center; gap: 6px; background: #ffffff; border: 1px solid var(--border-color); border-radius: 20px; padding: 4px 10px; box-shadow: var(--shadow-soft);">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted); flex-shrink: 0;"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                    <select id="lang-switcher-select" style="border: none; background: transparent; font-size: 12px; font-weight: 700; color: var(--text-color); cursor: pointer; outline: none;">
+                        <option value="th">TH</option>
+                        <option value="en">ENG</option>
+                        <option value="ja">JP</option>
+                        <option value="zh">ZH</option>
+                    </select>
+                </div>
                 <button id="topbar-phone-btn" class="btn" style="padding: 7px 15px; font-size: 12.5px; display: flex; align-items: center; gap: 6px; background: rgba(59, 130, 246, 0.12); color: var(--primary-color); border: 1px solid rgba(59, 130, 246, 0.28); border-radius: 20px; font-weight: 600; cursor: pointer; transition: all 0.2s ease;">
-                    📱 หน้าจอโทรศัพท์ (Simulator)
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                    <span data-i18n="topbar_phone_btn">หน้าจอโทรศัพท์ (Simulator)</span>
                 </button>
                 <div class="badge">
                     <span class="badge-dot"></span>
-                    Local Testing Server
+                    <span data-i18n="badge_local_server">Local Testing Server</span>
                 </div>
             </div>
         </header>
@@ -1477,23 +1532,58 @@
                         <!-- 4. TAB: CALLS & RESERVATIONS LOGS -->
             <div class="tab-content" id="tab-history">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <h3 style="font-size:16px; font-weight:800; display: flex; align-items: center; gap: 6px;">
+                    <h3 style="font-size:16px; font-weight:800; display: flex; align-items: center; gap: 8px;">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-                        ประวัติความจำการสนทนา & บันทึกการจอง
+                        <span data-i18n="history_title">ประวัติความจำการสนทนา & บันทึกการจอง</span>
+                        <span id="history-live-pill" style="font-size: 11px; font-weight: 600; background: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                            <span style="width: 6px; height: 6px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 6px #10b981;"></span>
+                            <span data-i18n="live_realtime">Live Realtime</span>
+                        </span>
                     </h3>
-                    <button id="refresh-history-btn" class="btn btn-outline" style="padding:6px 14px; font-size:11.5px; display: flex; align-items: center; gap: 4px;">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                        รีเฟรชข้อมูลลูกค้า
+                    <button id="refresh-history-btn" class="btn btn-outline" style="padding:6px 14px; font-size:11.5px; display: flex; align-items: center; gap: 6px;">
+                        <svg id="refresh-history-icon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                        <span data-i18n="refresh_btn">รีเฟรชข้อมูลลูกค้า</span>
                     </button>
                 </div>
 
                 <div class="form-grid" style="grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: start;">
                     <!-- Call Logs -->
                     <div class="table-card">
-                        <h4 style="font-size:14px; font-weight:700; color:var(--text-color); margin-bottom:16px; display:flex; align-items:center; gap:6px;">
+                        <h4 style="font-size:14px; font-weight:700; color:var(--text-color); margin-bottom:12px; display:flex; align-items:center; gap:6px;">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                            ประวัติบันทึกการโทรของลูกค้า (Call Summary History)
+                            <span data-i18n="call_history_header">ประวัติบันทึกการโทรของลูกค้า (Call Summary History)</span>
                         </h4>
+
+                        <!-- Customer & Date Filters -->
+                        <div class="history-filter-card" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px;">
+                            <!-- Filter by Customer -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                                <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--text-color);">
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    <span data-i18n="filter_customer">แยกตามลูกค้า:</span>
+                                </div>
+                                <div id="customer-filter-pills" style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    <!-- Dynamic customer pills rendered by JS -->
+                                </div>
+                            </div>
+                            
+                            <!-- Filter by Date & Search -->
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                    <div style="display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-color);">
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                        <span data-i18n="filter_date">เลือกวันที่:</span>
+                                    </div>
+                                    <input type="date" id="filter-call-date" style="padding: 4px 10px; font-size: 11.5px; border-radius: 8px; border: 1px solid var(--border-color); background: #ffffff; color: var(--text-color); font-weight: 600; outline: none; cursor: pointer;">
+                                    <button id="btn-date-today" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;" data-i18n="date_today">วันนี้</button>
+                                    <button id="btn-date-clear" class="btn btn-outline" style="padding: 3px 8px; font-size: 11px; border-radius: 6px;" data-i18n="date_all">ทุกลำดับวัน</button>
+                                </div>
+                                <div id="filter-status-count" style="font-size: 11.5px; color: var(--primary-color); font-weight: 700;">
+                                    <!-- JS updates count -->
+                                </div>
+                            </div>
+                        </div>
+
                         <div id="customer-logs-list" style="display: flex; flex-direction: column; gap: 14px;">
                             <!-- JS populates logs -->
                         </div>
@@ -1503,7 +1593,7 @@
                     <div class="table-card">
                         <h4 style="font-size:14px; font-weight:700; color:var(--text-color); margin-bottom:16px; display:flex; align-items:center; gap:6px;">
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                            รายชื่อการจองโต๊ะสำเร็จ (Table Reservations)
+                            <span data-i18n="reservations_header">รายชื่อการจองโต๊ะสำเร็จ (Table Reservations)</span>
                         </h4>
                         <div id="reservations-list" style="display: flex; flex-direction: column; gap: 12px;">
                             <!-- JS populates reservations -->
@@ -1521,24 +1611,33 @@
                         <div class="dialer-box">
                             <h4 style="font-size: 13.5px; font-weight: 700; color: var(--text-color); margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
                                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                                จำลองการโทรเข้า (Simulator)
+                                <span data-i18n="dialer_title">จำลองการโทรเข้า (Simulator)</span>
                             </h4>
                             <div style="display: flex; flex-direction: column; gap: 12px;">
                                 <div class="form-group">
-                                    <label>ชื่อผู้จำลองการโทร (Caller Name):</label>
+                                    <label data-i18n="select_preset_caller">เลือกโปรไฟล์ผู้โทร (Preset Profile):</label>
+                                    <select id="dialer-preset-caller" style="padding: 7px 10px; font-size: 12px; border-radius: 8px; border: 1px solid var(--border-color); background: white; color: var(--text-color); font-weight: 600; cursor: pointer;">
+                                        <option value="vera">Vera Sun (081-234-5678)</option>
+                                        <option value="ken">KEN (0988828521)</option>
+                                        <option value="custom">Custom (กำหนดเอง)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="caller_name_label">ชื่อผู้จำลองการโทร (Caller Name):</label>
                                     <input type="text" id="dialer-name" value="Vera Sun" placeholder="ระบุชื่อของคุณ">
                                 </div>
                                 <div class="form-group">
-                                    <label>เบอร์โทรศัพท์ (Phone Number):</label>
+                                    <label data-i18n="caller_phone_label">เบอร์โทรศัพท์ (Phone Number):</label>
                                     <input type="tel" id="dialer-phone" value="081-234-5678" placeholder="08X-XXX-XXXX">
                                 </div>
                                 <div style="display: flex; gap: 8px; margin-top: 6px;">
                                     <button id="dialer-start-btn" class="btn" style="flex: 1; padding: 12px; display: flex; align-items: center; justify-content: center; gap: 6px;">
                                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block;"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                                        จำลองโทรเข้า (Call)
+                                        <span data-i18n="call_btn">จำลองโทรเข้า (Call)</span>
                                     </button>
                                     <button id="dialer-toggle-phone-btn" class="btn btn-secondary" style="padding: 12px 14px; display: flex; align-items: center; justify-content: center; gap: 6px;" title="เปิดหรือปิดหน้าจอโทรศัพท์จำลอง">
-                                        📱 หน้าจอ
+                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                        <span data-i18n="phone_screen_btn">หน้าจอ</span>
                                     </button>
                                 </div>
                             </div>
@@ -1921,10 +2020,10 @@
                         displayResList.forEach(res => {
                             const tr = document.createElement('tr');
                             tr.innerHTML = `
-                                <td style="font-weight:700;">🔖 ${escapeHtml(res.name)}</td>
+                                <td style="font-weight:700;">${escapeHtml(res.name)}</td>
                                 <td style="color:var(--text-muted); font-size:11.5px;">${escapeHtml(res.date_time)}</td>
                                 <td style="font-weight:600; text-align:center;">${res.guests} ท่าน</td>
-                                <td><span class="status-pill success">✓ จองสำเร็จ</span></td>
+                                <td><span class="status-pill success">จองสำเร็จ</span></td>
                             `;
                             resTbody.appendChild(tr);
                         });
@@ -2619,8 +2718,11 @@
                     source.onended = () => {
                         const idx = this.activeSources.indexOf(source);
                         if (idx > -1) this.activeSources.splice(idx, 1);
-                        if (this.activeSources.length === 0 && this.onPlaybackStateChange) {
-                            this.onPlaybackStateChange(false);
+                        if (this.activeSources.length === 0) {
+                            this.nextStartTime = this.audioCtx ? this.audioCtx.currentTime : 0;
+                            if (this.onPlaybackStateChange) {
+                                this.onPlaybackStateChange(false);
+                            }
                         }
                     };
                 } catch(err) {
@@ -2897,6 +2999,14 @@
             const holoOrb = document.getElementById('ai-holo-orb');
 
             if (isConnected) {
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    try {
+                        ws.send(JSON.stringify({
+                            event: 'playback_state',
+                            isPlaying: isPlaying
+                        }));
+                    } catch(e) {}
+                }
                 if (isPlaying) {
                     // Update main avatar button in sandbox tab
                     if (mainAvatarBtn) {
@@ -3032,14 +3142,22 @@
                         const inputBuffer = audioProcessingEvent.inputBuffer;
                         const inputData = inputBuffer.getChannelData(0);
                         
-                        // Prevent speaker echo bleed from falsely triggering Barge-In while AI is speaking
-                        if (isReceivingAudio) {
+                        // Check if bot audio is actively playing through speakers
+                        const botIsPlaying = Boolean(player && player.activeSources && player.activeSources.length > 0);
+
+                        // Only suppress faint speaker bleed while bot is actively outputting sound
+                        if (botIsPlaying) {
                             let sum = 0;
                             for (let i = 0; i < inputData.length; i++) {
                                 sum += inputData[i] * inputData[i];
                             }
                             const rms = Math.sqrt(sum / inputData.length);
-                            if (rms < 0.045) return;
+                            // Only filter out low-level speaker bleed, allow normal voice through
+                            if (rms < 0.015) return;
+
+                            // User is speaking / barging in! Stop AI playback immediately
+                            if (player) player.clear();
+                            isReceivingAudio = false;
                         }
 
                         // Downsample 48kHz (browser default) to 16kHz PCM (Gemini expectation)
@@ -3252,14 +3370,14 @@
                     else if (msg.event === 'end_call') {
                         log('📞 สิ้นสุดการสนทนา (End Call): AI วางสายและบันทึกประวัติการโทรเรียบร้อยแล้ว', 'system');
                         endPhoneCall();
-                        setTimeout(() => {
-                            if (typeof loadCustomerHistory === 'function') {
-                                loadCustomerHistory();
-                            }
-                            if (typeof loadDashboardStats === 'function') {
-                                loadDashboardStats();
-                            }
-                        }, 1000);
+                        schedulePostCallUpdate();
+                    }
+                    else if (msg.event === 'call_saved') {
+                        log('⚡ บันทึกประวัติการโทรและวิเคราะห์ข้อมูลเรียบร้อยแล้ว', 'system');
+                        isCallFinishing = false;
+                        removeProcessingCard();
+                        if (typeof loadCustomerHistory === 'function') loadCustomerHistory();
+                        if (typeof loadDashboardStats === 'function') loadDashboardStats();
                     }
                 };
 
@@ -3279,6 +3397,7 @@
         }
 
         function disconnect() {
+            const hadActiveCall = isConnected;
             isConnected = false;
             stopCallTimer();
             
@@ -3337,6 +3456,10 @@
 
             // Refresh recent lists on dashboard
             loadDashboardStats();
+
+            if (hadActiveCall) {
+                schedulePostCallUpdate();
+            }
         }
 
         // Downsampling utility function
@@ -3697,16 +3820,17 @@
                             tr.innerHTML = `
                                 <td>
                                     <strong style="color:var(--text-color); font-size:13px;">${escapeHtml(cust.caller_name)}</strong>
-                                    <div style="font-size:11px; color:var(--text-muted);">📞 ${escapeHtml(cust.phone)}</div>
+                                    <div style="font-size:11px; color:var(--text-muted);">${escapeHtml(cust.phone)}</div>
                                 </td>
                                 <td>
-                                    <span style="background:${sentBg}; color:${sentColor}; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px;">
-                                        ${cust.last_sentiment === 'Positive' ? '🟢 Positive' : (cust.last_sentiment === 'Negative' ? '🔴 Negative' : '⚪ Neutral')}
+                                    <span style="background:${sentBg}; color:${sentColor}; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;">
+                                        <span style="width:6px; height:6px; border-radius:50%; background:${sentColor}; display:inline-block;"></span>
+                                        ${cust.last_sentiment || 'Neutral'}
                                     </span>
                                 </td>
                                 <td>
                                     <span style="background:#e0e7ff; color:#4f46e5; padding:3px 8px; border-radius:6px; font-weight:700; font-size:11px;">
-                                        🎯 ${escapeHtml(cust.last_intent)}
+                                        ${escapeHtml(cust.last_intent)}
                                     </span>
                                 </td>
                                 <td style="font-size:12px; color:var(--text-muted); max-width:240px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">
@@ -3722,116 +3846,515 @@
             }
         }
 
+        // ==========================================
+        // MULTI-LANGUAGE (i18n) DICTIONARY & HANDLERS
+        // ==========================================
+        const i18n = {
+            th: {
+                nav_dashboard: "แดชบอร์ด",
+                nav_configure: "ตั้งค่าระบบ (Admin)",
+                nav_prompt: "คลังข้อมูล (Knowledge)",
+                nav_history: "ประวัติการโทร & การจอง",
+                nav_sandbox: "ทดสอบเสียงโทรศัพท์",
+                topbar_title: "Customer Memory & Booking Logs",
+                topbar_phone_btn: "หน้าจอโทรศัพท์ (Simulator)",
+                badge_local_server: "Local Testing Server",
+                history_title: "ประวัติความจำการสนทนา & บันทึกการจอง",
+                live_realtime: "Live Realtime",
+                refresh_btn: "รีเฟรชข้อมูลลูกค้า",
+                call_history_header: "ประวัติบันทึกการโทรของลูกค้า (Call Summary History)",
+                reservations_header: "รายชื่อการจองโต๊ะสำเร็จ (Table Reservations)",
+                filter_customer: "แยกตามลูกค้า:",
+                filter_date: "เลือกวันที่:",
+                all_customers: "ทุกคน (All)",
+                date_all: "ทุกลำดับวัน",
+                date_today: "วันนี้",
+                showing_calls: "แสดง {count} จาก {total} สาย",
+                no_calls_found: "ไม่พบประวัติการโทรตรงกับเงื่อนไขที่เลือก",
+                no_history_at_all: "ไม่มีประวัติการโทรสนทนาย้อนหลัง",
+                summary_label: "สรุปผล:",
+                sentiment_reason_label: "วิเคราะห์อารมณ์:",
+                transcript_all: "แสดงบทสนทนาทั้งหมด ({count} ข้อความ)",
+                caller_phone_prefix: "เบอร์โทร:",
+                intent_prefix: "Intent:",
+                sec_unit: "วินาที",
+                unspecified: "ไม่ระบุ",
+                dialer_title: "จำลองการโทรเข้า (Simulator)",
+                select_preset_caller: "เลือกโปรไฟล์ผู้โทร (Preset Profile):",
+                caller_name_label: "ชื่อผู้จำลองการโทร (Caller Name):",
+                caller_phone_label: "เบอร์โทรศัพท์ (Phone Number):",
+                call_btn: "จำลองโทรเข้า (Call)",
+                phone_screen_btn: "หน้าจอ",
+                analyzing_title: "กำลังวิเคราะห์และสรุปผลการโทรด้วย AI...",
+                analyzing_desc: "ระบบกำลังสกัดบทสรุป อารมณ์ และวัตถุประสงค์ของการโทร ข้อมูลจะอัปเดตขึ้นอัตโนมัติทันที",
+                reservations_empty: "ไม่มีรายการจองโต๊ะในระบบ",
+                booking_success: "จองสำเร็จ"
+            },
+            en: {
+                nav_dashboard: "Dashboard",
+                nav_configure: "Configure (Admin)",
+                nav_prompt: "Knowledge Base",
+                nav_history: "Calls & Reservations",
+                nav_sandbox: "Console Sandbox",
+                topbar_title: "Customer Memory & Booking Logs",
+                topbar_phone_btn: "Phone Simulator",
+                badge_local_server: "Local Testing Server",
+                history_title: "Customer Memory & Booking Logs",
+                live_realtime: "Live Realtime",
+                refresh_btn: "Refresh Customer Data",
+                call_history_header: "Call Summary History",
+                reservations_header: "Table Reservations",
+                filter_customer: "Filter by Customer:",
+                filter_date: "Select Date:",
+                all_customers: "All Customers",
+                date_all: "All Dates",
+                date_today: "Today",
+                showing_calls: "Showing {count} of {total} calls",
+                no_calls_found: "No calls matched the selected filters",
+                no_history_at_all: "No call history recorded yet",
+                summary_label: "Summary:",
+                sentiment_reason_label: "Sentiment Analysis:",
+                transcript_all: "Show Full Transcript ({count} messages)",
+                caller_phone_prefix: "Phone:",
+                intent_prefix: "Intent:",
+                sec_unit: "sec",
+                unspecified: "N/A",
+                dialer_title: "Inbound Call Simulator",
+                select_preset_caller: "Select Caller Profile:",
+                caller_name_label: "Caller Name:",
+                caller_phone_label: "Phone Number:",
+                call_btn: "Start Call",
+                phone_screen_btn: "Screen",
+                analyzing_title: "Analyzing call intelligence with AI...",
+                analyzing_desc: "Extracting summary, customer sentiment and primary intent in real-time...",
+                reservations_empty: "No reservations found in system",
+                booking_success: "Confirmed"
+            },
+            ja: {
+                nav_dashboard: "ダッシュボード",
+                nav_configure: "システム設定 (Admin)",
+                nav_prompt: "店舗ナレッジ (Knowledge)",
+                nav_history: "通話・予約履歴",
+                nav_sandbox: "通話シミュレーター",
+                topbar_title: "通話メモリ・予約ログ",
+                topbar_phone_btn: "電話画面 (シミュレーター)",
+                badge_local_server: "ローカルテストサーバー",
+                history_title: "顧客会話メモリ＆予約記録",
+                live_realtime: "リアルタイム同期",
+                refresh_btn: "顧客データを更新",
+                call_history_header: "顧客通話サマリー履歴",
+                reservations_header: "テーブル予約完了一覧",
+                filter_customer: "顧客別表示:",
+                filter_date: "日付選択:",
+                all_customers: "すべての顧客",
+                date_all: "全期間",
+                date_today: "今日",
+                showing_calls: "{total}件中 {count}件を表示",
+                no_calls_found: "条件に一致する通話履歴がありません",
+                no_history_at_all: "通話履歴はありません",
+                summary_label: "要約:",
+                sentiment_reason_label: "感情分析理由:",
+                transcript_all: "全会話ログを表示 ({count}件)",
+                caller_phone_prefix: "電話番号:",
+                intent_prefix: "目的:",
+                sec_unit: "秒",
+                unspecified: "未指定",
+                dialer_title: "着信シミュレーター",
+                select_preset_caller: "発信者プロファイル選択:",
+                caller_name_label: "発信者名:",
+                caller_phone_label: "電話番号:",
+                call_btn: "発信テスト (Call)",
+                phone_screen_btn: "画面",
+                analyzing_title: "AIで通話内容をリアルタイム分析中...",
+                analyzing_desc: "会話の要約、顧客感情、意図を抽出しています...",
+                reservations_empty: "予約記録はありません",
+                booking_success: "予約完了"
+            },
+            zh: {
+                nav_dashboard: "仪表板",
+                nav_configure: "系统配置 (Admin)",
+                nav_prompt: "知识库 (Knowledge)",
+                nav_history: "通话与预订记录",
+                nav_sandbox: "语音沙盒测试",
+                topbar_title: "客户对话与预订记录",
+                topbar_phone_btn: "手机模拟器",
+                badge_local_server: "本地测试服务器",
+                history_title: "客户对话记忆与预订记录",
+                live_realtime: "实时同步中",
+                refresh_btn: "刷新客户数据",
+                call_history_header: "客户通话摘要记录",
+                reservations_header: "餐桌预订成功列表",
+                filter_customer: "按客户筛选:",
+                filter_date: "选择日期:",
+                all_customers: "所有客户",
+                date_all: "所有日期",
+                date_today: "今天",
+                showing_calls: "显示 {count} / 共 {total} 条通话",
+                no_calls_found: "未找到符合条件的通话记录",
+                no_history_at_all: "暂无通话历史记录",
+                summary_label: "通话摘要:",
+                sentiment_reason_label: "情绪分析:",
+                transcript_all: "显示全部对话 ({count} 条)",
+                caller_phone_prefix: "电话:",
+                intent_prefix: "意图:",
+                sec_unit: "秒",
+                unspecified: "未提供",
+                dialer_title: "呼入模拟器 (Simulator)",
+                select_preset_caller: "选择预设来电者:",
+                caller_name_label: "来电者姓名:",
+                caller_phone_label: "电话号码:",
+                call_btn: "模拟呼叫 (Call)",
+                phone_screen_btn: "手机界面",
+                analyzing_title: "AI 正在实时分析与总结通话...",
+                analyzing_desc: "正在提炼通话摘要、客户情绪与核心意图，稍后将自动刷新...",
+                reservations_empty: "系统中暂无餐桌预订",
+                booking_success: "预订成功"
+            }
+        };
+
+        let currentLang = localStorage.getItem('apex_voice_lang') || 'th';
+
+        function t(key, params = {}) {
+            const dict = i18n[currentLang] || i18n['th'];
+            let text = dict[key] || (i18n['th'][key] || key);
+            for (const p in params) {
+                text = text.replace(new RegExp(`\\{${p}\\}`, 'g'), params[p]);
+            }
+            return text;
+        }
+
+        function setLanguage(lang) {
+            if (!i18n[lang]) lang = 'th';
+            currentLang = lang;
+            localStorage.setItem('apex_voice_lang', lang);
+            
+            const selectEl = document.getElementById('lang-switcher-select');
+            if (selectEl) selectEl.value = lang;
+
+            // Update DOM data-i18n elements
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (key && i18n[lang] && i18n[lang][key]) {
+                    el.textContent = i18n[lang][key];
+                }
+            });
+
+            if (cachedCallLogsData) {
+                renderCustomerFilterPills();
+                renderFilteredCallLogs();
+            }
+        }
+
+        // REAL-TIME AUTO UPDATE & POST-CALL PROCESSING STATE
+        let isCallFinishing = false;
+        let previousCallCount = 0;
+        let postCallPollTimers = [];
+
+        function showProcessingCard() {
+            const logsContainer = document.getElementById('customer-logs-list');
+            if (!logsContainer) return;
+            if (document.getElementById('call-processing-card')) return;
+
+            const card = document.createElement('div');
+            card.id = 'call-processing-card';
+            card.style.cssText = 'background: linear-gradient(135deg, rgba(79, 70, 229, 0.05), rgba(236, 72, 153, 0.04)); border: 1.5px dashed var(--primary-color); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 12px; animation: pulseGlow 1.8s infinite; box-shadow: var(--shadow-soft);';
+            card.innerHTML = `
+                <div style="font-size: 24px; line-height: 1; animation: spin 1.5s linear infinite; display: inline-block;">⏳</div>
+                <div style="flex: 1;">
+                    <div style="font-weight: 700; color: var(--primary-color); font-size: 13.5px; display: flex; align-items: center; gap: 8px;">
+                        <span>${t('analyzing_title')}</span>
+                        <span style="font-size: 10.5px; background: #e0e7ff; color: #4f46e5; padding: 2px 8px; border-radius: 6px; font-weight: 700;">Realtime AI</span>
+                    </div>
+                    <div style="color: var(--text-muted); font-size: 11.5px; margin-top: 3px;">
+                        ${t('analyzing_desc')}
+                    </div>
+                </div>
+            `;
+            logsContainer.insertBefore(card, logsContainer.firstChild);
+        }
+
+        function removeProcessingCard() {
+            const card = document.getElementById('call-processing-card');
+            if (card) card.remove();
+        }
+
+        function schedulePostCallUpdate() {
+            isCallFinishing = true;
+            showProcessingCard();
+
+            // Clear any previous poll timers
+            postCallPollTimers.forEach(t => clearTimeout(t));
+            postCallPollTimers = [];
+
+            // Multi-stage fallback polling (1.2s, 2.5s, 4.0s, 6.0s)
+            const intervals = [1200, 2500, 4000, 6000];
+            intervals.forEach(delay => {
+                const t = setTimeout(async () => {
+                    await loadCustomerHistory();
+                    if (typeof loadDashboardStats === 'function') {
+                        loadDashboardStats();
+                    }
+                }, delay);
+                postCallPollTimers.push(t);
+            });
+
+            const safetyTimer = setTimeout(() => {
+                isCallFinishing = false;
+                removeProcessingCard();
+            }, 7500);
+            postCallPollTimers.push(safetyTimer);
+        }
+
+        // REAL-TIME SERVER-SENT EVENTS (SSE)
+        let sseSource = null;
+        function initSSE() {
+            try {
+                if (sseSource) {
+                    try { sseSource.close(); } catch(e){}
+                }
+                sseSource = new EventSource('/api/events');
+                
+                sseSource.addEventListener('call_saved', (e) => {
+                    console.log('⚡ Real-time Event: call_saved received', e.data);
+                    isCallFinishing = false;
+                    removeProcessingCard();
+                    loadCustomerHistory();
+                    loadDashboardStats();
+                });
+                
+                sseSource.addEventListener('reservation_saved', (e) => {
+                    console.log('⚡ Real-time Event: reservation_saved received', e.data);
+                    loadCustomerHistory();
+                    loadDashboardStats();
+                });
+                
+                sseSource.onerror = () => {
+                    // Reconnect handled automatically by EventSource
+                };
+            } catch (err) {
+                console.warn('Could not initialize SSE:', err);
+            }
+        }
+        initSSE();
+
+        // CUSTOMER & DATE FILTER STATE
+        let cachedCallLogsData = null;
+        let currentCustomerFilter = 'all';
+        let currentDateFilter = '';
+
+        function renderCustomerFilterPills() {
+            const container = document.getElementById('customer-filter-pills');
+            if (!container || !cachedCallLogsData) return;
+
+            container.innerHTML = '';
+
+            let totalCalls = 0;
+            const phones = Object.keys(cachedCallLogsData);
+            phones.forEach(p => {
+                totalCalls += (cachedCallLogsData[p].history || []).length;
+            });
+
+            // All Customers Pill
+            const allBtn = document.createElement('button');
+            allBtn.className = 'cust-pill' + (currentCustomerFilter === 'all' ? ' active' : '');
+            allBtn.innerHTML = `<span>${t('all_customers')}</span> <span style="opacity:0.75; font-size:10.5px;">(${totalCalls})</span>`;
+            allBtn.addEventListener('click', () => {
+                currentCustomerFilter = 'all';
+                renderCustomerFilterPills();
+                renderFilteredCallLogs();
+            });
+            container.appendChild(allBtn);
+
+            // Individual Customer Pills
+            phones.forEach(phone => {
+                const client = cachedCallLogsData[phone];
+                const count = (client.history || []).length;
+                const name = client.caller_name || 'ลูกค้า';
+                
+                const btn = document.createElement('button');
+                btn.className = 'cust-pill' + (currentCustomerFilter === phone ? ' active' : '');
+                btn.innerHTML = `<span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:currentColor; margin-right:4px;"></span><span>${escapeHtml(name)}</span> <span style="opacity:0.75; font-size:10.5px;">(${count})</span>`;
+                btn.title = `เบอร์: ${phone}`;
+                btn.addEventListener('click', () => {
+                    currentCustomerFilter = phone;
+                    
+                    // Auto-sync dialer to this customer for convenience
+                    const dialerName = document.getElementById('dialer-name');
+                    const dialerPhone = document.getElementById('dialer-phone');
+                    if (dialerName) dialerName.value = name;
+                    if (dialerPhone) dialerPhone.value = phone;
+                    const preset = document.getElementById('dialer-preset-caller');
+                    if (preset) {
+                        if (name.toLowerCase().includes('vera')) preset.value = 'vera';
+                        else if (name.toLowerCase().includes('ken')) preset.value = 'ken';
+                        else preset.value = 'custom';
+                    }
+
+                    renderCustomerFilterPills();
+                    renderFilteredCallLogs();
+                });
+                container.appendChild(btn);
+            });
+        }
+
+        function renderFilteredCallLogs() {
+            const logsContainer = document.getElementById('customer-logs-list');
+            const countBadge = document.getElementById('filter-status-count');
+            if (!logsContainer || !cachedCallLogsData) return;
+
+            let allCalls = [];
+            const phones = Object.keys(cachedCallLogsData);
+            let totalCallsCount = 0;
+
+            phones.forEach(phone => {
+                const client = cachedCallLogsData[phone];
+                const history = client.history || [];
+                totalCallsCount += history.length;
+                
+                // Filter by customer
+                if (currentCustomerFilter !== 'all' && phone !== currentCustomerFilter) {
+                    return;
+                }
+
+                history.forEach(call => {
+                    // Filter by date
+                    if (currentDateFilter) {
+                        const callDate = (call.timestamp || '').split(' ')[0];
+                        if (callDate !== currentDateFilter) return;
+                    }
+
+                    allCalls.push({
+                        phone: phone,
+                        caller_name: client.caller_name || 'ลูกค้า',
+                        timestamp: call.timestamp,
+                        recording_file: call.recording_file,
+                        duration_sec: call.duration_sec,
+                        summary: call.summary || client.last_summary || 'สนทนากับผู้ช่วยเสียง',
+                        sentiment: call.sentiment || client.last_sentiment || 'Neutral',
+                        sentiment_reason: call.sentiment_reason || 'บทสนทนาทั่วไป',
+                        primary_intent: call.primary_intent || client.last_intent || 'สอบถามข้อมูลทั่วไป',
+                        transcript: call.transcript || []
+                    });
+                });
+            });
+
+            // Sort newest first
+            allCalls.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            if (countBadge) {
+                countBadge.textContent = t('showing_calls', { count: allCalls.length, total: totalCallsCount });
+            }
+
+            logsContainer.innerHTML = '';
+
+            if (isCallFinishing) {
+                showProcessingCard();
+            }
+
+            if (allCalls.length === 0 && !isCallFinishing) {
+                const emptyMsg = (currentCustomerFilter !== 'all' || currentDateFilter) ? t('no_calls_found') : t('no_history_at_all');
+                logsContainer.innerHTML = `<p style="font-size:12px; color:var(--text-muted); text-align:center; padding: 20px 0;">${emptyMsg}</p>`;
+                return;
+            }
+
+            allCalls.forEach((call, index) => {
+                const card = document.createElement('div');
+                card.className = 'history-call-card' + (index === 0 && !isCallFinishing ? ' new-entry' : '');
+                card.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:14px; padding:16px; font-size:13px; box-shadow: var(--shadow-soft); display:flex; flex-direction:column; gap:10px; margin-bottom: 12px;';
+                
+                const durText = call.duration_sec ? `${Math.ceil(call.duration_sec)} ${t('sec_unit')}` : t('unspecified');
+                const sentBg = call.sentiment === 'Positive' ? '#d1fae5' : (call.sentiment === 'Negative' ? '#fee2e2' : '#f1f5f9');
+                const sentColor = call.sentiment === 'Positive' ? '#10b981' : (call.sentiment === 'Negative' ? '#ef4444' : '#64748b');
+
+                const audioPlayerHtml = call.recording_file ? `
+                    <div class="audio-recording-box" style="margin-top:4px;">
+                        <audio controls style="width:100%; height:32px; border-radius: 6px;" src="/api/recordings/${escapeHtml(call.recording_file)}"></audio>
+                    </div>
+                ` : '';
+                
+                // Build transcript section if exists
+                let transcriptHtml = '';
+                if (call.transcript && call.transcript.length > 0) {
+                    const transcriptId = `transcript-${index}`;
+                    let turnsHtml = '';
+                    call.transcript.forEach(turn => {
+                        const isUser = turn.role === 'user';
+                        const senderName = isUser ? 'ลูกค้า' : 'AI';
+                        const bg = isUser ? 'rgba(79, 70, 229, 0.06)' : 'rgba(244, 244, 245, 0.8)';
+                        const border = isUser ? 'rgba(79, 70, 229, 0.15)' : 'rgba(228, 228, 231, 0.8)';
+                        const align = isUser ? 'align-self: flex-end; text-align: right;' : 'align-self: flex-start; text-align: left;';
+                        turnsHtml += `
+                            <div style="background:${bg}; border:1px solid ${border}; border-radius:10px; padding:8px 12px; font-size:12px; margin-bottom:6px; max-width:85%; ${align}">
+                                <strong style="color:var(--text-color); font-size:11px; display:block; margin-bottom:2px;">${senderName} (${turn.time || ''})</strong>
+                                <span>${escapeHtml(turn.text)}</span>
+                            </div>
+                        `;
+                    });
+                    transcriptHtml = `
+                        <div style="margin-top: 8px;">
+                            <button class="btn btn-outline" style="padding:4px 10px; font-size:11.5px; border-radius:8px; display:flex; align-items:center; gap:6px; font-weight:600; cursor:pointer;" onclick="const t = document.getElementById('${transcriptId}'); t.style.display = t.style.display === 'none' ? 'flex' : 'none';">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                <span>${t('transcript_all', { count: call.transcript.length })}</span>
+                            </button>
+                            <div id="${transcriptId}" style="display:none; flex-direction:column; gap:4px; background:#fafafa; border:1px solid var(--border-color); border-radius:10px; padding:12px; margin-top:8px; max-height:260px; overflow-y:auto; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
+                                ${turnsHtml}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-weight:700; color:var(--text-color); font-size:14px;">${escapeHtml(call.caller_name)}</span>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <span style="background:${sentBg}; color:${sentColor}; padding:2px 8px; border-radius:6px; font-weight:700; font-size:11px; display:inline-flex; align-items:center; gap:5px;">
+                                <span style="width:6px; height:6px; border-radius:50%; background:${sentColor}; display:inline-block;"></span>
+                                ${call.sentiment || 'Neutral'}
+                            </span>
+                            <span style="font-size:11.5px; background:var(--primary-light); color:var(--primary-color); padding:2px 8px; border-radius:6px; font-weight:700;">${durText}</span>
+                        </div>
+                    </div>
+                    <div style="color:var(--text-muted); font-size:11px; font-weight:600; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+                        <span>${t('caller_phone_prefix')} ${escapeHtml(call.phone)}</span>
+                        <span>${t('intent_prefix')} <strong style="color:var(--primary-color);">${escapeHtml(call.primary_intent)}</strong></span>
+                        <span>${escapeHtml(call.timestamp)}</span>
+                    </div>
+                    <div style="background:#faf9fd; border:1px solid var(--border-color); border-radius:10px; padding:10px; color:var(--text-color); line-height:1.4; font-size:12.5px;">
+                        <strong>${t('summary_label')}</strong> ${escapeHtml(call.summary)}
+                        <div style="font-size:11px; color:var(--text-muted); margin-top:4px;"><em>${t('sentiment_reason_label')} ${escapeHtml(call.sentiment_reason)}</em></div>
+                    </div>
+                    ${audioPlayerHtml}
+                    ${transcriptHtml}
+                `;
+                logsContainer.appendChild(card);
+            });
+        }
+
         // Load Customer Logs and Playback History
         async function loadCustomerHistory() {
+            const refreshIcon = document.getElementById('refresh-history-icon');
+            if (refreshIcon) refreshIcon.classList.add('spin-icon');
             try {
                 loadAnalyticsDashboard();
 
                 const logsRes = await fetch('/api/call-logs');
                 const logsJson = await logsRes.json();
-                const logsContainer = document.getElementById('customer-logs-list');
                 
-                if (logsContainer && logsJson.status === 'success') {
-                    logsContainer.innerHTML = '';
-                    const data = logsJson.data || {};
-                    const keys = Object.keys(data);
+                if (logsJson.status === 'success') {
+                    cachedCallLogsData = logsJson.data || {};
                     
-                    if (keys.length === 0) {
-                        logsContainer.innerHTML = '<p style="font-size:12px; color:var(--text-muted); text-align:center;">ไม่มีประวัติการโทรสนทนาย้อนหลัง</p>';
-                    } else {
-                        let allCalls = [];
-                        keys.forEach(phone => {
-                            const client = data[phone];
-                            const history = client.history || [];
-                            history.forEach(call => {
-                                allCalls.push({
-                                    phone: phone,
-                                    caller_name: client.caller_name || 'ลูกค้า',
-                                    timestamp: call.timestamp,
-                                    recording_file: call.recording_file,
-                                    duration_sec: call.duration_sec,
-                                    summary: call.summary || client.last_summary || 'สนทนากับผู้ช่วยเสียง',
-                                    sentiment: call.sentiment || client.last_sentiment || 'Neutral',
-                                    sentiment_reason: call.sentiment_reason || 'บทสนทนาทั่วไป',
-                                    primary_intent: call.primary_intent || client.last_intent || 'สอบถามข้อมูลทั่วไป',
-                                    transcript: call.transcript || []
-                                });
-                            });
-                        });
-                        
-                        // Sort newest first
-                        allCalls.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-                        
-                        allCalls.forEach((call, index) => {
-                            const card = document.createElement('div');
-                            card.className = 'history-call-card';
-                            card.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:14px; padding:16px; font-size:13px; box-shadow: var(--shadow-soft); display:flex; flex-direction:column; gap:10px; margin-bottom: 12px;';
-                            
-                            const durText = call.duration_sec ? `${Math.ceil(call.duration_sec)} วินาที` : 'ไม่ระบุ';
-                            const sentBg = call.sentiment === 'Positive' ? '#d1fae5' : (call.sentiment === 'Negative' ? '#fee2e2' : '#f1f5f9');
-                            const sentColor = call.sentiment === 'Positive' ? '#10b981' : (call.sentiment === 'Negative' ? '#ef4444' : '#64748b');
+                    let newTotal = 0;
+                    Object.keys(cachedCallLogsData).forEach(p => {
+                        newTotal += (cachedCallLogsData[p].history || []).length;
+                    });
 
-                            const audioPlayerHtml = call.recording_file ? `
-                                <div class="audio-recording-box" style="margin-top:4px;">
-                                    <audio controls style="width:100%; height:32px; border-radius: 6px;" src="/api/recordings/${escapeHtml(call.recording_file)}"></audio>
-                                </div>
-                            ` : '';
-                            
-                            // Build transcript section if exists
-                            let transcriptHtml = '';
-                            if (call.transcript && call.transcript.length > 0) {
-                                const transcriptId = `transcript-${index}`;
-                                let turnsHtml = '';
-                                call.transcript.forEach(turn => {
-                                    const isUser = turn.role === 'user';
-                                    const senderName = isUser ? 'ลูกค้า' : 'AI';
-                                    const bg = isUser ? 'rgba(79, 70, 229, 0.06)' : 'rgba(244, 244, 245, 0.8)';
-                                    const border = isUser ? 'rgba(79, 70, 229, 0.15)' : 'rgba(228, 228, 231, 0.8)';
-                                    const align = isUser ? 'align-self: flex-end; text-align: right;' : 'align-self: flex-start; text-align: left;';
-                                    turnsHtml += `
-                                        <div style="background:${bg}; border:1px solid ${border}; border-radius:10px; padding:8px 12px; font-size:12px; margin-bottom:6px; max-width:85%; ${align}">
-                                            <strong style="color:var(--text-color); font-size:11px; display:block; margin-bottom:2px;">${senderName} (${turn.time || ''})</strong>
-                                            <span>${escapeHtml(turn.text)}</span>
-                                        </div>
-                                    `;
-                                });
-                                transcriptHtml = `
-                                    <div style="margin-top: 8px;">
-                                        <button class="btn btn-outline" style="padding:4px 10px; font-size:11.5px; border-radius:8px; display:flex; align-items:center; gap:4px; font-weight:600; cursor:pointer;" onclick="const t = document.getElementById('${transcriptId}'); t.style.display = t.style.display === 'none' ? 'flex' : 'none';">
-                                            <span>💬</span> แสดงบทสนทนาทั้งหมด (${call.transcript.length} ข้อความ)
-                                        </button>
-                                        <div id="${transcriptId}" style="display:none; flex-direction:column; gap:4px; background:#fafafa; border:1px solid var(--border-color); border-radius:10px; padding:12px; margin-top:8px; max-height:260px; overflow-y:auto; box-shadow:inset 0 2px 4px rgba(0,0,0,0.02);">
-                                            ${turnsHtml}
-                                        </div>
-                                    </div>
-                                `;
-                            }
-                            
-                            card.innerHTML = `
-                                <div style="display:flex; justify-content:space-between; align-items:center;">
-                                    <span style="font-weight:700; color:var(--text-color); font-size:14px;">👤 ${escapeHtml(call.caller_name)}</span>
-                                    <div style="display:flex; gap:6px; align-items:center;">
-                                        <span style="background:${sentBg}; color:${sentColor}; padding:2px 8px; border-radius:6px; font-weight:700; font-size:11px;">
-                                            ${call.sentiment === 'Positive' ? '🟢 Positive' : (call.sentiment === 'Negative' ? '🔴 Negative' : '⚪ Neutral')}
-                                        </span>
-                                        <span style="font-size:11.5px; background:var(--primary-light); color:var(--primary-color); padding:2px 8px; border-radius:6px; font-weight:700;">⏱️ ${durText}</span>
-                                    </div>
-                                </div>
-                                <div style="color:var(--text-muted); font-size:11px; font-weight:600; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
-                                    <span>📞 เบอร์: ${escapeHtml(call.phone)}</span>
-                                    <span>🎯 Intent: <strong style="color:var(--primary-color);">${escapeHtml(call.primary_intent)}</strong></span>
-                                    <span>📅 ${escapeHtml(call.timestamp)}</span>
-                                </div>
-                                <div style="background:#faf9fd; border:1px solid var(--border-color); border-radius:10px; padding:10px; color:var(--text-color); line-height:1.4; font-size:12.5px;">
-                                    <strong>สรุปผล:</strong> ${escapeHtml(call.summary)}
-                                    <div style="font-size:11px; color:var(--text-muted); margin-top:4px;"><em>💡 วิเคราะห์อารมณ์: ${escapeHtml(call.sentiment_reason)}</em></div>
-                                </div>
-                                ${audioPlayerHtml}
-                                ${transcriptHtml}
-                            `;
-                            logsContainer.appendChild(card);
-                        });
+                    if (previousCallCount > 0 && newTotal > previousCallCount) {
+                        isCallFinishing = false;
                     }
+                    previousCallCount = newTotal;
+
+                    renderCustomerFilterPills();
+                    renderFilteredCallLogs();
                 }
 
                 // Reservations Table
@@ -3843,18 +4366,18 @@
                     resContainer.innerHTML = '';
                     const list = resJson.data || [];
                     if (list.length === 0) {
-                        resContainer.innerHTML = '<p style="font-size:12px; color:var(--text-muted); text-align:center;">ไม่มีรายการจองโต๊ะในระบบ</p>';
+                        resContainer.innerHTML = `<p style="font-size:12px; color:var(--text-muted); text-align:center;">${t('reservations_empty')}</p>`;
                     } else {
                         list.forEach(res => {
                             const row = document.createElement('div');
                             row.style.cssText = 'background:#ffffff; border:1px solid var(--border-color); border-radius:14px; padding:16px; font-size:13px; display:flex; justify-content:space-between; align-items:center; box-shadow: var(--shadow-soft);';
                             row.innerHTML = `
                                 <div>
-                                    <div style="font-weight:700; color:var(--text-color); font-size:14px; margin-bottom:4px;">🔖 ${escapeHtml(res.id)} - ${escapeHtml(res.name)}</div>
-                                    <div style="color:var(--text-muted); font-size:12px; font-weight:500;">📞 ติดต่อ: ${escapeHtml(res.phone)}</div>
-                                    <div style="color:var(--text-muted); font-size:12px; font-weight:500; margin-top:2px;">📅 จอง: <strong>${escapeHtml(res.date_time)}</strong> (${res.guests} ท่าน - ${escapeHtml(res.type)})</div>
+                                    <div style="font-weight:700; color:var(--text-color); font-size:14px; margin-bottom:4px;">${escapeHtml(res.id)} - ${escapeHtml(res.name)}</div>
+                                    <div style="color:var(--text-muted); font-size:12px; font-weight:500;">ติดต่อ: ${escapeHtml(res.phone)}</div>
+                                    <div style="color:var(--text-muted); font-size:12px; font-weight:500; margin-top:2px;">เวลาจอง: <strong>${escapeHtml(res.date_time)}</strong> (${res.guests} ท่าน - ${escapeHtml(res.type)})</div>
                                 </div>
-                                <span class="status-pill success" style="flex-shrink:0;">✓ จองสำเร็จ</span>
+                                <span class="status-pill success" style="flex-shrink:0;">${t('booking_success')}</span>
                             `;
                             resContainer.appendChild(row);
                         });
@@ -3862,6 +4385,8 @@
                 }
             } catch (err) {
                 console.error('Failed to load customers and reservations list:', err);
+            } finally {
+                if (refreshIcon) refreshIcon.classList.remove('spin-icon');
             }
         }
 
@@ -4016,6 +4541,65 @@
             refreshHistoryBtn.addEventListener('click', loadCustomerHistory);
         }
         loadCustomerHistory();
+
+        // Language Switcher Dropdown
+        const langSwitcherSelect = document.getElementById('lang-switcher-select');
+        if (langSwitcherSelect) {
+            langSwitcherSelect.value = currentLang;
+            langSwitcherSelect.addEventListener('change', (e) => {
+                setLanguage(e.target.value);
+            });
+        }
+        // Apply initial language translation
+        setLanguage(currentLang);
+
+        // Date Filter Listeners
+        const filterDateInput = document.getElementById('filter-call-date');
+        if (filterDateInput) {
+            filterDateInput.addEventListener('change', (e) => {
+                currentDateFilter = e.target.value;
+                renderFilteredCallLogs();
+            });
+        }
+
+        const btnDateToday = document.getElementById('btn-date-today');
+        if (btnDateToday) {
+            btnDateToday.addEventListener('click', () => {
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                const todayStr = `${y}-${m}-${d}`;
+                if (filterDateInput) filterDateInput.value = todayStr;
+                currentDateFilter = todayStr;
+                renderFilteredCallLogs();
+            });
+        }
+
+        const btnDateClear = document.getElementById('btn-date-clear');
+        if (btnDateClear) {
+            btnDateClear.addEventListener('click', () => {
+                if (filterDateInput) filterDateInput.value = '';
+                currentDateFilter = '';
+                renderFilteredCallLogs();
+            });
+        }
+
+        // Dialer Preset Caller Selection
+        const dialerPreset = document.getElementById('dialer-preset-caller');
+        if (dialerPreset) {
+            dialerPreset.addEventListener('change', (e) => {
+                const dialerName = document.getElementById('dialer-name');
+                const dialerPhone = document.getElementById('dialer-phone');
+                if (e.target.value === 'vera') {
+                    if (dialerName) dialerName.value = 'Vera Sun';
+                    if (dialerPhone) dialerPhone.value = '081-234-5678';
+                } else if (e.target.value === 'ken') {
+                    if (dialerName) dialerName.value = 'KEN';
+                    if (dialerPhone) dialerPhone.value = '0988828521';
+                }
+            });
+        }
 
         // CALL SIMULATOR TRIGGER
         const dialerStartBtn = document.getElementById('dialer-start-btn');

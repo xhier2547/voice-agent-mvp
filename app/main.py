@@ -1,3 +1,26 @@
+import sys
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+def safe_print(*args, **kwargs):
+    try:
+        print(*args, **kwargs)
+    except Exception:
+        try:
+            # Fallback ascii representation if terminal is stubborn
+            safe_args = [str(a).encode("ascii", errors="backslashreplace").decode("ascii") for a in args]
+            print(*safe_args, **kwargs)
+        except Exception:
+            pass
+
 import json
 import asyncio
 import logging
@@ -10,7 +33,7 @@ import csv
 import uuid
 import pypdf
 from fastapi import FastAPI, WebSocket, Request, Response, Body, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, JSONResponse, FileResponse, StreamingResponse
 import websockets
 from app import config, audio, twilio_client, gemini_client
 
@@ -221,6 +244,63 @@ async def get_reservations_api():
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
+# Real-time Server-Sent Events (SSE) for Instant UI Updates
+event_subscribers = set()
+
+async def broadcast_event(event_type: str, data: dict = None):
+    data = data or {}
+    message = f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+    dead = set()
+    for queue in list(event_subscribers):
+        try:
+            await queue.put(message)
+        except Exception:
+            dead.add(queue)
+    for q in dead:
+        event_subscribers.discard(q)
+
+def notify_event_sync(event_type: str, data: dict = None):
+    """Safely notify real-time subscribers from sync or async contexts."""
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+            
+        if loop and loop.is_running():
+            asyncio.create_task(broadcast_event(event_type, data))
+        else:
+            asyncio.run(broadcast_event(event_type, data))
+    except Exception as e:
+        logger.warning(f"Failed to broadcast real-time event '{event_type}': {e}")
+
+@app.get("/api/events")
+async def sse_events(request: Request):
+    queue = asyncio.Queue()
+    event_subscribers.add(queue)
+    async def event_generator():
+        try:
+            yield ": connected\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    yield msg
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"
+        finally:
+            event_subscribers.discard(queue)
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
 @app.get("/api/analytics/sentiment-intent")
 async def get_sentiment_intent_analytics_api():
     try:
@@ -321,13 +401,15 @@ def analyze_call_intelligence(transcript_list: list) -> dict:
     - sentiment_score: float 0.0 to 1.0
     - sentiment_reason: short explanation
     - primary_intent: main customer intent category
+    - language: primary language spoken by customer ("th" | "en" | "ja" | "zh")
     """
     default_res = {
         "summary": "ลูกค้าสนทนากับระบบผู้ช่วยเสียง",
         "sentiment": "Neutral",
         "sentiment_score": 0.5,
         "sentiment_reason": "บทสนทนาทั่วไป",
-        "primary_intent": "สอบถามข้อมูลทั่วไป"
+        "primary_intent": "สอบถามข้อมูลทั่วไป",
+        "language": "th"
     }
 
     if not transcript_list:
@@ -350,7 +432,8 @@ def analyze_call_intelligence(transcript_list: list) -> dict:
   "sentiment": "Positive" | "Neutral" | "Negative",
   "sentiment_score": 0.95,
   "sentiment_reason": "เหตุผลสั้นๆ สำหรับอารมณ์ของลูกค้า",
-  "primary_intent": "เลือกหมวดหมู่อย่างใดอย่างหนึ่งจาก: 'สอบถามโปรโมชั่น', 'จองโต๊ะ', 'สอบถามสถานที่และเวลา', 'สอบถามเมนู', 'สมัคร/เช็กแต้มสมาชิก', 'อื่นๆ'"
+  "primary_intent": "เลือกหมวดหมู่อย่างใดอย่างหนึ่งจาก: 'สอบถามโปรโมชั่น', 'จองโต๊ะ', 'สอบถามสถานที่และเวลา', 'สอบถามเมนู', 'สมัคร/เช็กแต้มสมาชิก', 'อื่นๆ'",
+  "language": "th" | "en" | "ja" | "zh"
 }}"""
 
     try:
@@ -388,7 +471,8 @@ def analyze_call_intelligence(transcript_list: list) -> dict:
                             "sentiment": parsed.get("sentiment", default_res["sentiment"]),
                             "sentiment_score": float(parsed.get("sentiment_score", 0.5)),
                             "sentiment_reason": parsed.get("sentiment_reason", default_res["sentiment_reason"]),
-                            "primary_intent": parsed.get("primary_intent", default_res["primary_intent"])
+                            "primary_intent": parsed.get("primary_intent", default_res["primary_intent"]),
+                            "language": parsed.get("language", default_res["language"])
                         }
     except Exception as e:
         logger.error(f"Error analyzing call intelligence: {e}")
@@ -398,6 +482,17 @@ def analyze_call_intelligence(transcript_list: list) -> dict:
 def generate_conversation_summary(transcript_list: list) -> str:
     res = analyze_call_intelligence(transcript_list)
     return res.get("summary", "ลูกค้าสนทนากับระบบผู้ช่วยเสียง")
+
+def build_greeting_prompt(company: str, caller_name: str = None, pref_lang: str = "th") -> str:
+    n = caller_name or "ลูกค้า"
+    if pref_lang == "ja":
+        return f"กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน {company} เป็นภาษาญี่ปุ่นอย่างอบอุ่นและสุภาพ (ทักทายชื่อลูกค้า {n} หากมี) และถามความต้องการสั้นๆ 1 ประโยค เช่น '{company}でございます。{n}様、お電話ありがとうございます！今日はどのようなご用件でしょうか？'"
+    elif pref_lang == "en":
+        return f"Please warmly welcome customer {n} to {company} in natural English and briefly ask how you can assist them today in 1 short sentence."
+    elif pref_lang == "zh":
+        return f"请用中文亲切问候客户 {n} 致电 {company}，并简短询问今天有什么可以帮忙的。"
+    else:
+        return f"กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน {company} (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
 
 def save_call_log(
     phone: str,
@@ -410,7 +505,8 @@ def save_call_log(
     sentiment: str = "Neutral",
     sentiment_score: float = 0.5,
     sentiment_reason: str = "บทสนทนาทั่วไป",
-    primary_intent: str = "สอบถามข้อมูลทั่วไป"
+    primary_intent: str = "สอบถามข้อมูลทั่วไป",
+    language: str = "th"
 ):
     try:
         try:
@@ -429,6 +525,7 @@ def save_call_log(
                 "last_summary": "ลูกค้าโทรเข้ามาสนทนากับระบบ Voice Agent",
                 "last_sentiment": sentiment,
                 "last_intent": primary_intent,
+                "preferred_language": language or "th",
                 "recording_file": None,
                 "history": []
             }
@@ -440,6 +537,8 @@ def save_call_log(
         logs[phone_key]["last_summary"] = summary or logs[phone_key]["last_summary"]
         logs[phone_key]["last_sentiment"] = sentiment
         logs[phone_key]["last_intent"] = primary_intent
+        if language:
+            logs[phone_key]["preferred_language"] = language
         if recording_file:
             logs[phone_key]["recording_file"] = recording_file
 
@@ -455,13 +554,20 @@ def save_call_log(
             "sentiment_score": sentiment_score,
             "sentiment_reason": sentiment_reason,
             "primary_intent": primary_intent,
+            "language": language or "th",
             "transcript": transcript or [],
             "tools_called": tools_called or []
         })
 
         with open("data/call_logs.json", "w", encoding="utf-8") as f:
             json.dump(logs, f, ensure_ascii=False, indent=2)
-        logger.info(f"Saved call log, sentiment ({sentiment}), intent ({primary_intent}) & transcript for {phone_key}")
+        logger.info(f"Saved call log, sentiment ({sentiment}), intent ({primary_intent}), language ({language}) & transcript for {phone_key}")
+        notify_event_sync("call_saved", {
+            "phone": phone_key,
+            "caller_name": logs[phone_key]["caller_name"],
+            "timestamp": now_str,
+            "summary": logs[phone_key]["last_summary"]
+        })
     except Exception as e:
         logger.error(f"Error saving call log: {e}")
 
@@ -653,7 +759,8 @@ async def handle_media_stream(twilio_ws: WebSocket):
                             print("DEBUG: Gemini Live API setup complete.", flush=True)
                             setup_event.set()
                             company = gemini_client.get_company_name()
-                            greeting_prompt = f"กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน {company} (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
+                            pref_lang = gemini_client.get_caller_preferred_language(phone=phone, name=caller_name)
+                            greeting_prompt = build_greeting_prompt(company, caller_name, pref_lang)
                             trigger_msg = {
                                 "clientContent": {
                                     "turns": [
@@ -773,6 +880,7 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                         date_time=args.get("date_time"),
                                         guests=args.get("guests")
                                     )
+                                    notify_event_sync("reservation_saved", result.get("reservation"))
                                     tool_resp = {
                                         "toolResponse": {
                                             "functionResponses": [
@@ -867,15 +975,20 @@ async def handle_media_stream(twilio_ws: WebSocket):
         
         # Save transcript and summary to logs
         if transcript_history:
-            summary = generate_conversation_summary(transcript_history)
+            intel = await asyncio.to_thread(analyze_call_intelligence, transcript_history)
             save_call_log(
                 phone=phone,
                 caller_name=caller_name,
-                summary=summary,
+                summary=intel.get("summary"),
                 recording_file=None,
                 duration_sec=duration_sec,
                 transcript=transcript_history,
-                tools_called=tools_called
+                tools_called=tools_called,
+                sentiment=intel.get("sentiment", "Neutral"),
+                sentiment_score=intel.get("sentiment_score", 0.5),
+                sentiment_reason=intel.get("sentiment_reason", "บทสนทนาทั่วไป"),
+                primary_intent=intel.get("primary_intent", "สอบถามข้อมูลทั่วไป"),
+                language=intel.get("language", "th")
             )
         print("DEBUG: WebSocket connections cleaned up.", flush=True)
 
@@ -992,6 +1105,13 @@ async def handle_local_stream(client_ws: WebSocket):
                             n = message.get("name")
                             if p: recorder.phone = p
                             if n: recorder.caller_name = n
+                        elif event == "playback_state":
+                            is_playing = message.get("isPlaying", False)
+                            session["bot_playing_in_browser"] = is_playing
+                            if not is_playing:
+                                session["raw_mic_audio_start_time"] = None
+                                session["first_stt_text_time"] = None
+                                session["turn_speech_start_time"] = None
                         elif event == "turn_start":
                             # DEBUG: detect overlapping turns
                             if session["turn_active"]:
@@ -1022,6 +1142,9 @@ async def handle_local_stream(client_ws: WebSocket):
                                 f"audio_chunks={session['vad_audio_chunks']}"
                             )
                         elif event == "audio":
+                            if session.get("bot_playing_in_browser", False):
+                                continue
+
                             pcm_b64 = message.get("data")
                             if pcm_b64:
                                 now_pc = time.perf_counter()
@@ -1111,7 +1234,8 @@ async def handle_local_stream(client_ws: WebSocket):
                             setup_event.set()
                             await client_ws.send_json({"event": "status", "text": "Ready to chat! Start speaking..."})
                             company = gemini_client.get_company_name()
-                            greeting_prompt = f"กรุณากล่าวทักทายต้อนรับลูกค้าเข้าสู่ร้าน {company} (หากทราบชื่อลูกค้าจากระบบให้ทักทายด้วยชื่ออย่างเป็นกันเอง) และถามความต้องการของเขาทันทีสั้นๆ"
+                            pref_lang = gemini_client.get_caller_preferred_language(phone=p, name=n)
+                            greeting_prompt = build_greeting_prompt(company, n, pref_lang)
                             trigger_msg = {
                                 "clientContent": {
                                     "turns": [
@@ -1142,9 +1266,9 @@ async def handle_local_stream(client_ws: WebSocket):
                                     
                                     if not session.get("first_stt_text_time"):
                                         session["first_stt_text_time"] = now_pc
-                                        print(f"[TIMING {t_now}] GEMINI STT FIRST TEXT: '{transcript}' (Raw Audio Arrived -> Text Output Latency: {stt_lag_ms:.0f} ms / {stt_lag_ms/1000:.2f}s)", flush=True)
+                                        safe_print(f"[TIMING {t_now}] GEMINI STT FIRST TEXT: '{transcript}' (Raw Audio Arrived -> Text Output Latency: {stt_lag_ms:.0f} ms / {stt_lag_ms/1000:.2f}s)", flush=True)
                                     else:
-                                        print(f"[TIMING {t_now}] GEMINI STT TEXT FRAGMENT: '{transcript}' (Lag since audio start: {stt_lag_ms/1000:.2f}s)", flush=True)
+                                        safe_print(f"[TIMING {t_now}] GEMINI STT TEXT FRAGMENT: '{transcript}' (Lag since audio start: {stt_lag_ms/1000:.2f}s)", flush=True)
 
                                     if transcript_history and transcript_history[-1]["role"] == "user":
                                         prev_text = transcript_history[-1]["text"]
@@ -1175,11 +1299,11 @@ async def handle_local_stream(client_ws: WebSocket):
                                         turn_sp = session.get("turn_speech_start_time") or last_sp
                                         sil_ms = (now_pc - last_sp) * 1000
                                         tot_ms = (now_pc - turn_sp) * 1000
-                                        print(f"\n[TIMING {t_now}] AI FIRST TEXT FRAGMENT: '{transcript}'", flush=True)
-                                        print(f"  └─► Silence-to-Text Latency: {sil_ms:.0f} ms ({sil_ms/1000:.2f}s)", flush=True)
-                                        print(f"  └─► Total Turn Time: {tot_ms:.0f} ms ({tot_ms/1000:.2f}s)", flush=True)
+                                        safe_print(f"\n[TIMING {t_now}] AI FIRST TEXT FRAGMENT: '{transcript}'", flush=True)
+                                        safe_print(f"  └─► Silence-to-Text Latency: {sil_ms:.0f} ms ({sil_ms/1000:.2f}s)", flush=True)
+                                        safe_print(f"  └─► Total Turn Time: {tot_ms:.0f} ms ({tot_ms/1000:.2f}s)", flush=True)
                                     else:
-                                        print(f"[TIMING {t_now}] AI Text Fragment: '{transcript}'", flush=True)
+                                        safe_print(f"[TIMING {t_now}] AI Text Fragment: '{transcript}'", flush=True)
 
                                     if transcript_history and transcript_history[-1]["role"] == "model":
                                         prev_text = transcript_history[-1]["text"]
@@ -1254,16 +1378,6 @@ async def handle_local_stream(client_ws: WebSocket):
                                 session["raw_mic_audio_last_time"] = None
                                 session["first_stt_text_time"] = None
 
-                                if session.get("pending_end_call"):
-                                    logger.info(f"[TURN {session['turn_id']}] END_CALL pending -> scheduling hangup in 3.5s after turn complete")
-                                    async def delayed_hangup():
-                                        await asyncio.sleep(3.5)
-                                        try:
-                                            await client_ws.send_json({"event": "end_call"})
-                                        except Exception:
-                                            pass
-                                    asyncio.create_task(delayed_hangup())
-
                             if server_content.get("interrupted"):
                                 logger.info(
                                     f"[TURN {session['turn_id']}] INTERRUPTED / BARGE-IN"
@@ -1291,7 +1405,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                         clean_text = text.strip()
                                         if not (clean_text.startswith("**") or "I have identified" in clean_text or "Retrieving" in clean_text or "Gathering" in clean_text or "Confirming" in clean_text or "I've" in clean_text):
                                             try:
-                                                print(f"DEBUG Gemini Text: {clean_text}", flush=True)
+                                                safe_print(f"DEBUG Gemini Text: {clean_text}", flush=True)
                                             except Exception:
                                                 pass
                                             try:
@@ -1313,11 +1427,11 @@ async def handle_local_stream(client_ws: WebSocket):
                                             turn_sp = session.get("turn_speech_start_time") or last_sp
                                             sil_ms = (now_pc - last_sp) * 1000
                                             tot_ms = (now_pc - turn_sp) * 1000
-                                            print(f"\n" + "="*75, flush=True)
-                                            print(f"🚀 [TIMING {t_now}] 🔊 FIRST AI AUDIO PCM PACKET SENT TO BROWSER!", flush=True)
-                                            print(f"   ⏱️ Silence-to-Audio Latency (User stopped speech -> AI speaks): {sil_ms:.0f} ms ({sil_ms/1000:.2f}s)", flush=True)
-                                            print(f"   ⏱️ Total Turn Time (First user word -> AI speaks): {tot_ms:.0f} ms ({tot_ms/1000:.2f}s)", flush=True)
-                                            print(f"="*75 + "\n", flush=True)
+                                            safe_print(f"\n" + "="*75, flush=True)
+                                            safe_print(f"🚀 [TIMING {t_now}] 🔊 FIRST AI AUDIO PCM PACKET SENT TO BROWSER!", flush=True)
+                                            safe_print(f"   ⏱️ Silence-to-Audio Latency (User stopped speech -> AI speaks): {sil_ms:.0f} ms ({sil_ms/1000:.2f}s)", flush=True)
+                                            safe_print(f"   ⏱️ Total Turn Time (First user word -> AI speaks): {tot_ms:.0f} ms ({tot_ms/1000:.2f}s)", flush=True)
+                                            safe_print(f"="*75 + "\n", flush=True)
 
                                         if (
                                             session["turn_active"]
@@ -1399,6 +1513,7 @@ async def handle_local_stream(client_ws: WebSocket):
                                         date_time=args.get("date_time"),
                                         guests=args.get("guests")
                                     )
+                                    notify_event_sync("reservation_saved", result.get("reservation"))
                                     try:
                                         await client_ws.send_json({
                                             "event": "tool_info",
@@ -1559,7 +1674,7 @@ async def handle_local_stream(client_ws: WebSocket):
         rec_file = recorder.save()
         # Save transcript and summary to logs
         if transcript_history:
-            intel = analyze_call_intelligence(transcript_history)
+            intel = await asyncio.to_thread(analyze_call_intelligence, transcript_history)
             save_call_log(
                 phone=recorder.phone,
                 caller_name=recorder.caller_name,
@@ -1571,8 +1686,13 @@ async def handle_local_stream(client_ws: WebSocket):
                 sentiment=intel.get("sentiment", "Neutral"),
                 sentiment_score=intel.get("sentiment_score", 0.5),
                 sentiment_reason=intel.get("sentiment_reason", "บทสนทนาทั่วไป"),
-                primary_intent=intel.get("primary_intent", "สอบถามข้อมูลทั่วไป")
+                primary_intent=intel.get("primary_intent", "สอบถามข้อมูลทั่วไป"),
+                language=intel.get("language", "th")
             )
+        try:
+            await client_ws.send_json({"event": "call_saved"})
+        except Exception:
+            pass
         try:
             await client_ws.close()
         except Exception:
