@@ -390,6 +390,39 @@ async def get_recording_api(filename: str):
         return FileResponse(filepath, media_type="audio/wav")
     return JSONResponse({"status": "error", "message": "Recording file not found"}, status_code=404)
 
+@app.get("/api/rag/stats")
+async def get_rag_stats_api():
+    try:
+        stats = gemini_client.get_rag_performance_stats()
+        return {"status": "success", "data": stats}
+    except Exception as e:
+        logger.error(f"Error retrieving RAG stats: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/rag/test-query")
+async def test_rag_query_api(request: Request):
+    try:
+        body = await request.json()
+        q = body.get("query", "")
+        result = gemini_client.match_knowledge(q)
+        return {"status": "success", "data": result}
+    except Exception as e:
+        logger.error(f"Error testing RAG query: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.get("/api/orders")
+async def get_orders_api():
+    try:
+        orders_path = "data/orders.json"
+        try:
+            with open(orders_path, "r", encoding="utf-8") as f:
+                orders = json.load(f)
+        except Exception:
+            orders = []
+        return {"status": "success", "data": orders}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
 import urllib.request
 import urllib.error
 
@@ -881,6 +914,26 @@ async def handle_media_stream(twilio_ws: WebSocket):
                                         guests=args.get("guests")
                                     )
                                     notify_event_sync("reservation_saved", result.get("reservation"))
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+                                elif fn_name == "record_order":
+                                    result = gemini_client.execute_record_order(
+                                        item_name=args.get("item_name"),
+                                        size=args.get("size", "M"),
+                                        quantity=args.get("quantity", 1),
+                                        notes=args.get("notes", ""),
+                                        session_id=session.get("call_sid") or phone
+                                    )
+                                    notify_event_sync("order_saved", result.get("order"))
                                     tool_resp = {
                                         "toolResponse": {
                                             "functionResponses": [
@@ -1519,6 +1572,36 @@ async def handle_local_stream(client_ws: WebSocket):
                                             "event": "tool_info",
                                             "tool": "📅 book_table",
                                             "target": args.get("name", "ลูกค้า"),
+                                            "description": result.get("message")
+                                        })
+                                    except Exception:
+                                        pass
+                                    tool_resp = {
+                                        "toolResponse": {
+                                            "functionResponses": [
+                                                {
+                                                    "response": {"output": result},
+                                                    "id": call_id
+                                                }
+                                            ]
+                                        }
+                                    }
+                                    await gemini_ws.send(json.dumps(tool_resp))
+
+                                elif fn_name == "record_order":
+                                    result = gemini_client.execute_record_order(
+                                        item_name=args.get("item_name"),
+                                        size=args.get("size", "M"),
+                                        quantity=args.get("quantity", 1),
+                                        notes=args.get("notes", ""),
+                                        session_id=f"local_{caller_phone}"
+                                    )
+                                    notify_event_sync("order_saved", result.get("order"))
+                                    try:
+                                        await client_ws.send_json({
+                                            "event": "tool_info",
+                                            "tool": "☕ record_order",
+                                            "target": f"{args.get('quantity', 1)}x {args.get('item_name')} ({args.get('size', 'M')})",
                                             "description": result.get("message")
                                         })
                                     except Exception:

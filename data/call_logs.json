@@ -2,10 +2,10 @@
   "081-234-5678": {
     "caller_name": "Vera Sun",
     "phone": "081-234-5678",
-    "last_call_time": "2026-09-14 03:15:29",
-    "total_calls": 72,
-    "last_summary": "ลูกค้าสอบถามเมนูสินค้าและเครื่องดื่ม โดยสนใจรายละเอียดของ Matcha Coconut Latte และทำการสั่งเครื่องดื่มดังกล่าว 2 แก้วไซส์ L",
-    "preferred_language": "ja",
+    "last_call_time": "2026-09-14 12:08:09",
+    "total_calls": 75,
+    "last_summary": "บทสนทนายังไม่เริ่มในส่วนของลูกค้า AI กำลังทักทายและสอบถามความต้องการของลูกค้า",
+    "preferred_language": "th",
     "history": [
       {
         "timestamp": "2026-08-25 21:40:12",
@@ -1913,11 +1913,186 @@
           "query_knowledge",
           "end_call"
         ]
+      },
+      {
+        "call_id": "call_081-234-5678_20260914_052903",
+        "timestamp": "2026-09-14 05:29:03",
+        "topic": "สอบถามเมนู",
+        "recording_file": "call_081-234-5678_20260914_042854.wav",
+        "duration_sec": 3600.3,
+        "summary": "ลูกค้าได้สั่ง Matcha Coconut Latte ไซส์ L แต่บทสนทนาจบลงอย่างกะทันหันโดยที่ AI ไม่ได้ตอบรับคำถามสุดท้ายของลูกค้า",
+        "sentiment": "Neutral",
+        "sentiment_score": 0.55,
+        "sentiment_reason": "ลูกค้าสามารถสั่งเครื่องดื่มได้สำเร็จ แต่คำพูดสุดท้ายของลูกค้าที่อาจเป็นการสอบถามเพิ่มเติมหรือไม่จบประโยคถูกตัดจบโดย AI",
+        "primary_intent": "สอบถามเมนู",
+        "language": "th",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "KYOTO CAFE でございます。Vera Sun様、お電話 ありが とうございます！今日は どの ような ご用 件でし ょうか？",
+            "time": "04:28:56"
+          },
+          {
+            "role": "user",
+            "text": "โค โค นัท มัชชา มีส",
+            "time": "04:29:10"
+          },
+          {
+            "role": "model",
+            "text": "承知いたし ました。Matcha Coconut Latte でございます ね。サイズ はい かがいた します か？",
+            "time": "04:29:16"
+          },
+          {
+            "role": "user",
+            "text": "this",
+            "time": "04:29:26"
+          },
+          {
+            "role": "model",
+            "text": "Lサイズ ですね。ご注文 は以上 でよろ しい でしょ うか？",
+            "time": "04:29:27"
+          },
+          {
+            "role": "user",
+            "text": "Đây chưa",
+            "time": "04:29:40"
+          },
+          {
+            "role": "model",
+            "text": "お電話 ありが とうご ざいま した。良い 一日 を！",
+            "time": "04:29:40"
+          }
+        ],
+        "tools_called": [
+          "end_call"
+        ]
+      },
+      {
+        "call_id": "call_081-234-5678_20260914_120601",
+        "timestamp": "2026-09-14 12:06:01",
+        "topic": "สอบถามเมนู",
+        "recording_file": "call_081-234-5678_20260914_110555.wav",
+        "duration_sec": 3600.3,
+        "summary": "ลูกค้าสั่ง Matcha Coconut Latte ขนาดกลาง 1 แก้ว และครัวซองต์ 1 ชิ้น นอกจากนี้ยังสอบถามข้อมูลเกี่ยวกับ Wi-Fi และที่จอดรถ ซึ่งได้รับการตอบกลับจากผู้ช่วย AI อย่างครบถ้วน",
+        "sentiment": "Positive",
+        "sentiment_score": 0.9,
+        "sentiment_reason": "ลูกค้าสามารถสั่งซื้อสินค้าและได้รับข้อมูลที่ต้องการเกี่ยวกับการบริการเสริมอย่าง Wi-Fi และที่จอดรถอย่างชัดเจนและครบถ้วน",
+        "primary_intent": "สอบถามเมนู",
+        "language": "en",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะคุณ Vera Sun ยินดีต้อนรับ กลับมา นะคะ!วันนี้ต้องการ รับบริการ หรือสอบถาม ข้อมูล อะไร เพิ่มเติม ดีคะ?",
+            "time": "11:05:56"
+          },
+          {
+            "role": "user",
+            "text": "เอิ่ม อยาก ลอง พูด ภาษา อัง กฤษ ได้มั้ย",
+            "time": "11:06:09"
+          },
+          {
+            "role": "model",
+            "text": "Certainly! I'd be happy to assist you in English.How can I help you today?",
+            "time": "11:06:12"
+          },
+          {
+            "role": "user",
+            "text": "So I want to order some thing can you fi nd me some dri nk",
+            "time": "11:06:19"
+          },
+          {
+            "role": "model",
+            "text": "Certainly! Our signature drinks are\"AI Drip Coffee,\"which is a special cold brew mixed with fruit juice,and\"Matcha Coconut Latte,\"a rich authentic matcha with fresh coconut milk.Are you interested in either of those?",
+            "time": "11:06:24"
+          },
+          {
+            "role": "user",
+            "text": "อ อ อ อ อ",
+            "time": "11:06:45"
+          },
+          {
+            "role": "model",
+            "text": "Great choice!Would you like a small,medium,or large size?",
+            "time": "11:06:50"
+          },
+          {
+            "role": "user",
+            "text": "Um, I want the medi um si ze.Can I get some sna ck s or fo od?",
+            "time": "11:06:58"
+          },
+          {
+            "role": "model",
+            "text": "Yes, we have various snacks and bakeries.Is there anything specific you're looking for?",
+            "time": "11:07:03"
+          },
+          {
+            "role": "user",
+            "text": "Yeah, I want that to call and one",
+            "time": "11:07:12"
+          },
+          {
+            "role": "model",
+            "text": "So that's one medium Matcha Coconut Latte and one croissant.Is that correct?",
+            "time": "11:07:17"
+          },
+          {
+            "role": "user",
+            "text": "Ye s.Tha t's right.",
+            "time": "11:07:26"
+          },
+          {
+            "role": "model",
+            "text": "Perfect! Your order will be ready shortly.Is there anything else I can help you with today?",
+            "time": "11:07:27"
+          },
+          {
+            "role": "user",
+            "text": "I want to ask about some car d pa th or do you have?",
+            "time": "11:07:36"
+          },
+          {
+            "role": "model",
+            "text": "Yes, we have Wi-Fi available!The password is 00000001R_.Would you like me to send it to your phone via SMS?",
+            "time": "11:07:42"
+          },
+          {
+            "role": "user",
+            "text": "No no t now and I want to know about the car par k.",
+            "time": "11:07:57"
+          },
+          {
+            "role": "model",
+            "text": "We offer 3 hours of free parking for customers at True Digital Park.Is that what you wanted to know?",
+            "time": "11:08:02"
+          }
+        ],
+        "tools_called": []
+      },
+      {
+        "call_id": "call_081-234-5678_20260914_120809",
+        "timestamp": "2026-09-14 12:08:09",
+        "topic": "อื่นๆ",
+        "recording_file": "call_081-234-5678_20260914_110804.wav",
+        "duration_sec": 3600.3,
+        "summary": "บทสนทนายังไม่เริ่มในส่วนของลูกค้า AI กำลังทักทายและสอบถามความต้องการของลูกค้า",
+        "sentiment": "Neutral",
+        "sentiment_score": 0.5,
+        "sentiment_reason": "ยังไม่มีข้อมูลบทสนทนาจากลูกค้าเพื่อวิเคราะห์",
+        "primary_intent": "อื่นๆ",
+        "language": "th",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะคุณ Vera Sun ยินดีต้อนรับ กลับมา ค่ะ!วันนี้ต้องการ รับบริการ หรือสอบถาม อะไรเพิ่มเติม ดีคะ?",
+            "time": "11:08:05"
+          }
+        ],
+        "tools_called": []
       }
     ],
-    "recording_file": "call_081-234-5678_20260914_030513.wav",
-    "last_sentiment": "Positive",
-    "last_intent": "สอบถามเมนู"
+    "recording_file": "call_081-234-5678_20260914_110804.wav",
+    "last_sentiment": "Neutral",
+    "last_intent": "อื่นๆ"
   },
   "0656241293": {
     "caller_name": "ตอง",
@@ -2178,6 +2353,253 @@
           }
         ],
         "tools_called": []
+      }
+    ]
+  },
+  "0656241222": {
+    "caller_name": "KEN",
+    "phone": "0656241222",
+    "total_calls": 3,
+    "last_call_time": "2026-09-14 12:15:30",
+    "last_summary": "บทสนทนายังไม่เริ่มต้นในส่วนของลูกค้า ผู้ช่วย AI ได้ทักทายและสอบถามความต้องการในเบื้องต้น",
+    "last_sentiment": "Neutral",
+    "last_intent": "อื่นๆ",
+    "preferred_language": "th",
+    "recording_file": "call_0656241222_20260914_111526.wav",
+    "history": [
+      {
+        "call_id": "call_0656241222_20260914_113751",
+        "timestamp": "2026-09-14 11:37:51",
+        "topic": "สอบถามเมนู",
+        "recording_file": "call_0656241222_20260914_111742.wav",
+        "duration_sec": 1201.8,
+        "summary": "ลูกค้าสนใจสั่งเครื่องดื่มและสอบถามข้อมูลเกี่ยวกับที่จอดรถและ Wi-Fi ทางผู้ช่วย AI ได้ให้ข้อมูลที่จอดรถ Wi-Fi รวมถึงแนะนำเครื่องดื่ม Signature และยืนยันความสามารถในการสื่อสารภาษาอังกฤษ.",
+        "sentiment": "Positive",
+        "sentiment_score": 0.98,
+        "sentiment_reason": "ลูกค้าได้รับข้อมูลที่ต้องการอย่างครบถ้วนและบริการเป็นไปอย่างราบรื่น.",
+        "primary_intent": "สอบถามเมนู",
+        "language": "th",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะคุณ KEN ยินดีต้อนรับ กลับมา ค่ะ!วันนี้มีอะไร ให้ช่วย ดูแล หรือต้องการ สอบถาม อะไร เพิ่มเติม ไหมคะ?",
+            "time": "11:17:44"
+          },
+          {
+            "role": "user",
+            "text": "สวัสดีครับ วัน นี้ผม สน ใจ ที่จะ สั่ง เครื่อง ดื่ม และ อยาก สอบ ถาม เกี่ยว กับ บริการ ของ ที่จอด รถ หรือ ว่า Wi-Fi ด้วย ได้มั้ย ครับ",
+            "time": "11:17:54"
+          },
+          {
+            "role": "model",
+            "text": "ได้เลยค่ะ ยินดีให้บริการ ค่ะ สำหรับ บริการ ที่จอดรถ ลูกค้า สามารถ จอด ได้ฟรี3 ชั่วโมง ที่อาคาร ทรูดิจิทัล พาร์ค สุขุมวิท 101 นะคะ ส่วน Wi-Fi มีบริการ ฟรีทุกโต๊ะ ค่ะ รหัส คือ 00000001R_ ค่ะ สนใจ รับเครื่องดื่ม เมนูไหน ดีคะ?",
+            "time": "11:18:03"
+          },
+          {
+            "role": "user",
+            "text": "แล้ว เครื่อง ดื่ม มีอะไร แนะ นํา มั้ย ครับ ผม",
+            "time": "11:18:19"
+          },
+          {
+            "role": "model",
+            "text": "เครื่องดื่ม Signature ของเรา มี'AI Drip Coffee'ที่เป็น กาแฟ สกัด เย็น ผสม น้ำผลไม้สูตรพิเศษ และก็'Matcha Coconut Latte'ครับ เป็น มัทฉะ เข้มข้น ผสม น้ำมะพร้าว น้ำหอม แท้ๆ เลยครับ",
+            "time": "11:18:21"
+          },
+          {
+            "role": "user",
+            "text": "แล้ว คุณ สามารถ ภา ษา อังกฤษ ได้ มั้ย",
+            "time": "11:18:40"
+          },
+          {
+            "role": "model",
+            "text": "Yes, I can speak English!How can I assist you today?",
+            "time": "11:18:42"
+          }
+        ],
+        "tools_called": []
+      },
+      {
+        "call_id": "call_0656241222_20260914_114218",
+        "timestamp": "2026-09-14 11:42:18",
+        "topic": "อื่นๆ",
+        "recording_file": "call_0656241222_20260914_113711.wav",
+        "duration_sec": 301.3,
+        "summary": "บทสนทนาเพิ่งเริ่มต้นขึ้น ผู้ช่วย AI ได้ทักทายคุณ KEN และสอบถามถึงความต้องการในการบริการ แต่ลูกค้ายังไม่ได้ระบุความต้องการของตนเอง",
+        "sentiment": "Neutral",
+        "sentiment_score": 0.5,
+        "sentiment_reason": "ลูกค้ายังไม่ได้แสดงความต้องการหรืออารมณ์ใดๆ ในบทสนทนา",
+        "primary_intent": "อื่นๆ",
+        "language": "th",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะคุณ KEN ยินดีต้อนรับ กลับมาค่ะ!วันนี้ต้องการ สอบถาม หรือให้ช่วยเหลือ เรื่อง อะไรดีคะ?",
+            "time": "11:37:13"
+          }
+        ],
+        "tools_called": []
+      },
+      {
+        "call_id": "call_0656241222_20260914_121530",
+        "timestamp": "2026-09-14 12:15:30",
+        "topic": "อื่นๆ",
+        "recording_file": "call_0656241222_20260914_111526.wav",
+        "duration_sec": 3600.5,
+        "summary": "บทสนทนายังไม่เริ่มต้นในส่วนของลูกค้า ผู้ช่วย AI ได้ทักทายและสอบถามความต้องการในเบื้องต้น",
+        "sentiment": "Neutral",
+        "sentiment_score": 0.5,
+        "sentiment_reason": "ลูกค้ายังไม่ได้ตอบกลับหรือแสดงความรู้สึกใดๆ จึงไม่สามารถประเมินอารมณ์ได้",
+        "primary_intent": "อื่นๆ",
+        "language": "th",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะคุณ KEN ยินดีต้อนรับ กลับมา นะคะ!วันนี้ต้องการ ให้ช่วยเหลือ อะไร เพิ่มเติม ไหมคะ?",
+            "time": "11:15:28"
+          }
+        ],
+        "tools_called": []
+      }
+    ]
+  },
+  "0523123532": {
+    "caller_name": "rimuru",
+    "phone": "0523123532",
+    "total_calls": 2,
+    "last_call_time": "2026-09-14 12:41:06",
+    "last_summary": "ลูกค้าสอบถามเกี่ยวกับโปรโมชั่นและได้รับข้อมูลโปรโมชั่นเครื่องดื่มวันจันทร์ ลูกค้าแสดงความขอบคุณและพอใจกับข้อมูลที่ได้รับ",
+    "last_sentiment": "Positive",
+    "last_intent": "สอบถามโปรโมชั่น",
+    "preferred_language": "ja",
+    "recording_file": "call_0523123532_20260914_114100.wav",
+    "history": [
+      {
+        "call_id": "call_0523123532_20260914_123731",
+        "timestamp": "2026-09-14 12:37:31",
+        "topic": "สอบถามเมนู",
+        "recording_file": "call_0523123532_20260914_113723.wav",
+        "duration_sec": 3600.3,
+        "summary": "ลูกค้าสอบถามเกี่ยวกับเมนูแนะนำของร้าน และทำการสั่ง Matcha Coconut Latte ขนาด L จำนวน 1 แก้ว การสนทนาจบลงด้วยการยืนยันคำสั่งซื้อ.",
+        "sentiment": "Positive",
+        "sentiment_score": 0.85,
+        "sentiment_reason": "ลูกค้าสามารถสอบถามเมนูและสั่งสินค้าได้สำเร็จตามความต้องการ โดยไม่มีการแสดงความไม่พอใจหรือปัญหาที่แก้ไขไม่ได้.",
+        "primary_intent": "สอบถามเมนู",
+        "language": "ja",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะ ยินดีต้อนรับสู่KYOTO CAFE นะคะ ไม่ทราบว่า วันนี้ต้องการ รับบริการ อะไรดีคะ?",
+            "time": "11:37:24"
+          },
+          {
+            "role": "user",
+            "text": "お は よう ござ い ます。",
+            "time": "11:37:33"
+          },
+          {
+            "role": "model",
+            "text": "おはよう ございます！どのような ご用 件 でしょ うか？",
+            "time": "11:37:35"
+          },
+          {
+            "role": "user",
+            "text": "ඉ ස්සුමෝඉ සුසුමේව ඩන්න ගා",
+            "time": "11:37:45"
+          },
+          {
+            "role": "model",
+            "text": "当店 のお すすめ メニュー は、特別 なフ ルー ツと 水出 しコ ーヒー を 混ぜ た「AI Drip Coffee」と、本格 的 な抹 茶と ココ ナッ ツラ テ です が、お気 にな るも のは ござい ます か？",
+            "time": "11:37:49"
+          },
+          {
+            "role": "user",
+            "text": "何?",
+            "time": "11:38:03"
+          },
+          {
+            "role": "model",
+            "text": "AIド リップ コーヒー は、フルー ティー で さっぱ り とした 味わ いで、抹 茶コ コナ ッツラ テ は 濃厚 で クリー ミー な 人気 のメ ニュー です！他 にご 興味 のある ものは あります か？",
+            "time": "11:38:05"
+          },
+          {
+            "role": "user",
+            "text": "ช ก โค โค นัส อ่า อิคุกคาม",
+            "time": "11:38:21"
+          },
+          {
+            "role": "model",
+            "text": "申し訳 ござい ません、価格 に 関 して は 現在 手元 に情報 がご ざい ません で...少々 お調 べし ます ね。少々 お待ち くださ い。",
+            "time": "11:38:25"
+          },
+          {
+            "role": "user",
+            "text": "はい、 あ あ これ を ここ な ラ テ 1 お 願い し ます。あ と サイ ズ L で す 。",
+            "time": "11:38:39"
+          },
+          {
+            "role": "model",
+            "text": "かしこ まり ました。マッ チャコ コナ ッツラ テ Lサ イズ 1 点 ですね。他 にご 注文 はござ います か?",
+            "time": "11:38:52"
+          },
+          {
+            "role": "user",
+            "text": "大 丈夫 です 。",
+            "time": "11:39:03"
+          },
+          {
+            "role": "model",
+            "text": "お電話 ありが とうご ざいま した。失礼 いたし ます。ขอบคุณที่ใช้บริการร้าน KYOTO CAFE ค่ะ ยินดีให้บริการ เสมอ นะคะ",
+            "time": "11:39:04"
+          }
+        ],
+        "tools_called": [
+          "query_knowledge",
+          "end_call"
+        ]
+      },
+      {
+        "call_id": "call_0523123532_20260914_124106",
+        "timestamp": "2026-09-14 12:41:06",
+        "topic": "สอบถามโปรโมชั่น",
+        "recording_file": "call_0523123532_20260914_114100.wav",
+        "duration_sec": 3600.3,
+        "summary": "ลูกค้าสอบถามเกี่ยวกับโปรโมชั่นและได้รับข้อมูลโปรโมชั่นเครื่องดื่มวันจันทร์ ลูกค้าแสดงความขอบคุณและพอใจกับข้อมูลที่ได้รับ",
+        "sentiment": "Positive",
+        "sentiment_score": 0.9,
+        "sentiment_reason": "ลูกค้าได้รับข้อมูลโปรโมชั่นที่ต้องการและแสดงความขอบคุณ",
+        "primary_intent": "สอบถามโปรโมชั่น",
+        "language": "ja",
+        "transcript": [
+          {
+            "role": "model",
+            "text": "สวัสดีค่ะ ยินดีต้อนรับสู่KYOTO CAFE มีอะไร ให้ช่วยดูแล เพิ่มเติม ไหมคะ?",
+            "time": "11:41:01"
+          },
+          {
+            "role": "user",
+            "text": "なん で それ ?",
+            "time": "11:41:09"
+          },
+          {
+            "role": "model",
+            "text": "月曜日の プロモーション ですね。月曜 日は、午後1時 から4時 まで ドリンク 2 杯目 が50%OFF になります よ。他 に 何か お知 りにな りたい ことは ございます か?",
+            "time": "11:41:11"
+          },
+          {
+            "role": "user",
+            "text": "ライ ブ です 。あり が とう。お 疲れ 様 。",
+            "time": "11:41:33"
+          },
+          {
+            "role": "model",
+            "text": "お電話 ありが とうござ いました。失礼 いた します。",
+            "time": "11:41:36"
+          }
+        ],
+        "tools_called": [
+          "query_knowledge",
+          "end_call"
+        ]
       }
     ]
   }

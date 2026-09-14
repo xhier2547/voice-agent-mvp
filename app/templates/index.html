@@ -1368,6 +1368,67 @@
             <!-- 2. TAB: CONFIGURE (RAG ADMIN & DYNAMIC KNOWLEDGE) -->
             <div class="tab-content" id="tab-configure">
 
+                <!-- ENTERPRISE HYBRID RAG & CACHE PERFORMANCE MONITOR -->
+                <div class="table-card" style="margin-bottom: 24px; background: linear-gradient(180deg, #ffffff, #fafaff); border: 1px solid #e0e7ff;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <h3 style="font-size:16px; font-weight:800; color: var(--primary-color);">
+                                    Enterprise Hybrid RAG & Semantic Cache
+                                </h3>
+                                <span style="font-size: 11px; font-weight: 700; background: #e0e7ff; color: #4338ca; padding: 2px 10px; border-radius: 12px;">Okapi BM25 + ChromaDB RRF</span>
+                            </div>
+                            <p style="font-size:12px; color:var(--text-muted); margin-top:3px;">
+                                สถาปัตยกรรมค้นหาความรู้แบบสองแกน (Lexical + Dense Vector) พร้อมระบบ Reciprocal Rank Fusion, Cross-Scoring และ L1/L2 In-Memory Caching
+                            </p>
+                        </div>
+                        <button id="btn-refresh-rag-stats" onclick="loadRagStats()" style="padding: 6px 14px; font-size: 12px; font-weight: 600; background: #ffffff; border: 1px solid var(--border-color); border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/></svg>
+                            รีเฟรชสถิติ
+                        </button>
+                    </div>
+
+                    <!-- Telemetry Metric Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px;">
+                        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">เอกสาร & Chunks ในระบบ</div>
+                            <div id="rag-stat-docs" style="font-size: 20px; font-weight: 800; color: var(--text-color); margin-top: 4px;">--</div>
+                            <div style="font-size: 10.5px; color: #10b981; margin-top: 2px;">BM25 + Vector Synchronized</div>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">In-Memory Cache Hit Rate</div>
+                            <div id="rag-stat-hitrate" style="font-size: 20px; font-weight: 800; color: var(--primary-color); margin-top: 4px;">--%</div>
+                            <div id="rag-stat-hits" style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">0 / 0 queries</div>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">ความเร็วค้นหาเฉลี่ย (Latency)</div>
+                            <div id="rag-stat-latency" style="font-size: 20px; font-weight: 800; color: #10b981; margin-top: 4px;">-- ms</div>
+                            <div style="font-size: 10.5px; color: var(--text-muted); margin-top: 2px;">Cache &lt;0.1ms | Hybrid &lt;2ms</div>
+                        </div>
+                        <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 14px;">
+                            <div style="font-size: 11.5px; color: var(--text-muted); font-weight: 600;">คำศัพท์ที่ทำดัชนี (BM25 Terms)</div>
+                            <div id="rag-stat-terms" style="font-size: 20px; font-weight: 800; color: var(--text-color); margin-top: 4px;">--</div>
+                            <div style="font-size: 10.5px; color: #6366f1; margin-top: 2px;">Multi-lingual N-grams</div>
+                        </div>
+                    </div>
+
+                    <!-- Live RAG Query Sandbox Tester -->
+                    <div style="background: #ffffff; border: 1px solid #e0e7ff; border-radius: 12px; padding: 16px;">
+                        <div style="font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text-color);">
+                            ทดสอบค้นหา RAG แบบสด (Interactive Hybrid RAG Tester)
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <input id="rag-test-input" type="text" placeholder="พิมพ์คำถามเพื่อทดสอบ เช่น 'รหัส wifi คืออะไร', 'กาแฟซิกเนเจอร์', 'โปรโมชั่นวันจันทร์'" style="flex-grow: 1; padding: 10px 14px; font-size: 13px; border: 1px solid var(--border-color); border-radius: 8px; outline: none;" onkeydown="if(event.key==='Enter') executeRagTestQuery()" />
+                            <button onclick="executeRagTestQuery()" style="padding: 10px 18px; font-size: 13px; font-weight: 700; background: var(--primary-color); color: #ffffff; border: none; border-radius: 8px; cursor: pointer;">
+                                ทดสอบค้นหา
+                            </button>
+                        </div>
+                        <div id="rag-test-result" style="display: none; margin-top: 12px; padding: 12px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; font-size: 12.5px;">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- DYNAMIC KNOWLEDGE MANAGEMENT FILE UPLOAD -->
                 <div class="table-card" style="margin-bottom: 24px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
@@ -1763,6 +1824,9 @@
             // Trigger chart update or history reload if dashboard is activated
             if (tabId === 'tab-dashboard') {
                 loadDashboardStats();
+            } else if (tabId === 'tab-configure') {
+                if (typeof loadRagStats === 'function') loadRagStats();
+                if (typeof loadUploadedDocuments === 'function') loadUploadedDocuments();
             } else if (tabId === 'tab-history') {
                 if (typeof loadCustomerHistory === 'function') loadCustomerHistory();
             } else if (tabId === 'tab-sandbox') {
@@ -4442,6 +4506,73 @@
                 console.error('Failed to load uploaded documents:', err);
             }
         }
+
+        // Load Hybrid RAG Stats & Performance Telemetry
+        async function loadRagStats() {
+            try {
+                const res = await fetch('/api/rag/stats');
+                const json = await res.json();
+                if (json.status !== 'success') return;
+                const d = json.data;
+                const elDocs = document.getElementById('rag-stat-docs');
+                const elHitrate = document.getElementById('rag-stat-hitrate');
+                const elHits = document.getElementById('rag-stat-hits');
+                const elLat = document.getElementById('rag-stat-latency');
+                const elTerms = document.getElementById('rag-stat-terms');
+
+                if (elDocs) elDocs.textContent = `${d.total_documents} เอกสาร`;
+                if (elHitrate) elHitrate.textContent = `${d.cache_hit_rate_pct}%`;
+                if (elHits) elHits.textContent = `${d.cache_hits} / ${d.total_queries} queries (L1: ${d.cache_size_l1})`;
+                if (elLat) elLat.textContent = `${d.avg_latency_ms} ms`;
+                if (elTerms) elTerms.textContent = `${d.bm25_terms_indexed.toLocaleString()} คำ`;
+            } catch (err) {
+                console.error("Failed to load RAG stats:", err);
+            }
+        }
+
+        async function executeRagTestQuery() {
+            const input = document.getElementById('rag-test-input');
+            const resBox = document.getElementById('rag-test-result');
+            if (!input || !resBox) return;
+            const q = input.value.trim();
+            if (!q) return;
+
+            resBox.style.display = 'block';
+            resBox.innerHTML = '<div style="color:var(--text-muted); display:flex; align-items:center; gap:6px;"><span class="spin-icon">⏳</span> กำลังประมวลผลค้นหาด้วย Hybrid RAG (BM25 + ChromaDB RRF)...</div>';
+
+            try {
+                const res = await fetch('/api/rag/test-query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query: q })
+                });
+                const json = await res.json();
+                if (json.status === 'success' && json.data) {
+                    const d = json.data;
+                    const cacheBadge = d.cache_hit ? '<span style="background:#d1fae5; color:#065f46; padding:2px 8px; border-radius:6px; font-weight:700; font-size:11px;">Cache HIT (&lt;0.1ms)</span>' : '<span style="background:#e0e7ff; color:#3730a3; padding:2px 8px; border-radius:6px; font-weight:700; font-size:11px;">Real-Time Hybrid</span>';
+                    resBox.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+                            <strong style="color:var(--primary-color); font-size:13.5px;">${escapeHtml(d.section)}</strong>
+                            <div style="display:flex; gap:6px; align-items:center;">
+                                ${cacheBadge}
+                                <span style="font-weight:700; color:#10b981;">${d.similarity} Match</span>
+                                <span style="font-size:11.5px; color:var(--text-muted);">${d.latency_ms} ms</span>
+                            </div>
+                        </div>
+                        <div style="color:var(--text-color); margin-bottom:6px; line-height:1.5;">${escapeHtml(d.content)}</div>
+                        <div style="font-size:11px; color:var(--text-muted);">Engine: ${escapeHtml(d.method)}</div>
+                    `;
+                    loadRagStats();
+                } else {
+                    resBox.innerHTML = '<div style="color:#ef4444;">ไม่พบข้อมูลหรือเกิดข้อผิดพลาดในการค้นหา</div>';
+                }
+            } catch (err) {
+                resBox.innerHTML = `<div style="color:#ef4444;">เกิดข้อผิดพลาด: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        // Trigger on startup
+        loadRagStats();
 
         // Upload Document Function
         async function uploadDocumentFile(file) {

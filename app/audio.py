@@ -1,6 +1,7 @@
 try:
     import audioop
 except ImportError:
+    # pyrefly: ignore [missing-import]
     import audioop_lts as audioop
 import base64
 import logging
